@@ -77,8 +77,10 @@ def ingest(request: IngestRequest) -> IngestResponse:
     try:
         repo_root = load_repo(request.source)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to load repo: {exc}") from exc
-
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not access repository at '{request.source}'. Check the URL and try again."
+        ) from exc
     if not repo_root.exists():
         raise HTTPException(status_code=400, detail=f"Source path does not exist: {request.source}")
 

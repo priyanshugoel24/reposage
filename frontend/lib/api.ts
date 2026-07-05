@@ -9,3 +9,32 @@ export async function checkHealth(): Promise<unknown> {
 
   return response.json();
 }
+
+export interface IngestResponse {
+  repo_name: string;
+  files_processed: number;
+  chunks_created: number;
+  time_seconds: number;
+  summary: string;
+}
+
+interface ErrorResponse {
+  detail: string;
+}
+
+export class ApiError extends Error {}
+
+export async function ingestRepo(source: string, repo_name: string): Promise<IngestResponse> {
+  const response = await fetch(`${API_URL}/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source, repo_name }),
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

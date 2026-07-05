@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { checkHealth } from "@/lib/api";
+import IngestForm from "@/components/IngestForm";
 
 export default function Home() {
   const [status, setStatus] = useState("checking...");
@@ -22,6 +23,7 @@ export default function Home() {
           Point it at a repo. Ask it anything.
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-500">{status}</p>
+        <IngestForm />
       </main>
     </div>
   );
