@@ -100,3 +100,25 @@ The Day 12 report from Claude Code claiming this error occurred was never
 substantiated with an actual traceback and appears to have been an
 unverified guess. Treating this as resolved / non-issue unless it
 reproduces again with an actual stack trace in hand.
+
+
+Railway logs show a Hugging Face Hub anonymous-request warning on every
+container start (embedding model download via sentence-transformers).
+Not currently blocking, but repeated container restarts could eventually
+hit HF's anonymous rate limit. Fix if it becomes a problem: generate a
+free HF token and set HF_TOKEN as a Railway environment variable.
+
+
+Production /ingest on Railway free tier: ~118s for medmemory-mcp (33 files,
+143 chunks), vs ~13s locally. Likely CPU-constrained shared container +
+added network latency from GitHub archive download (two sequential HTTP
+calls vs one git clone). Not a bug — a real cost of the free tier. If this
+matters for a live demo, consider: pre-ingesting the demo repo ahead of
+time rather than ingesting live, or upgrading the Railway plan for more
+CPU.
+
+Backend fully deployed and verified on Railway:
+https://reposage-production-b926.up.railway.app
+Confirmed working: /health, /ingest (slow, ~118s on free tier), /query
+(fast, full citations). CORS still needs updating with the Vercel URL
+once frontend is deployed (see earlier note).
