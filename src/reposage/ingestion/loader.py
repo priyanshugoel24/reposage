@@ -1,10 +1,16 @@
 from dataclasses import dataclass
 from pathlib import Path
+import json
+import re
 import tempfile
-import git
+import urllib.error
+import urllib.request
+import zipfile
 
 SOURCE_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".java"}
 IGNORE_DIRS = {".git", "node_modules", "__pycahce__", "venv", ".venv", "dist", "build", "logs", ".github"}
+
+GITHUB_URL_RE = re.compile(r"github\.com[:/]([^/]+)/([^/.]+?)(?:\.git)?/?$")
 
 @dataclass
 class SourceFile :
@@ -14,13 +20,45 @@ class SourceFile :
     size_bytes : int
     last_modified : float
 
-def load_repo(source : str) -> Path:
-    """Return a local Path to the repo root, cloning if source is a URL."""
+def _parse_github_url(source: str) -> tuple[str, str] | None:
+    match = GITHUB_URL_RE.search(source)
+    if not match:
+        return None
+    return match.group(1), match.group(2)
 
-    if source.startswith("http") or source.startswith("git@"):
+def _get_default_branch(owner: str, repo: str) -> str:
+    api_url = f"https://api.github.com/repos/{owner}/{repo}"
+    try:
+        request = urllib.request.Request(
+            api_url, headers={"Accept": "application/vnd.github+json"}
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            return data.get("default_branch", "main")
+    except Exception:
+        return "main"
+
+def load_repo(source : str) -> Path:
+    """Return a local Path to the repo root, downloading if source is a GitHub URL."""
+
+    github_ref = _parse_github_url(source) if (source.startswith("http") or source.startswith("git@")) else None
+
+    if github_ref:
+        owner, repo = github_ref
+        branch = _get_default_branch(owner, repo)
+        archive_url = f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{branch}"
+
         tmp_dir = Path(tempfile.mkdtemp(prefix="reposage_"))
-        git.Repo.clone_from(source,tmp_dir, depth=1)
-        return tmp_dir
+        zip_path = tmp_dir / "repo.zip"
+        urllib.request.urlretrieve(archive_url, zip_path)
+
+        with zipfile.ZipFile(zip_path) as zip_file:
+            zip_file.extractall(tmp_dir)
+
+        zip_path.unlink()
+        extracted_dirs = [p for p in tmp_dir.iterdir() if p.is_dir()]
+        return extracted_dirs[0]
+
     return Path(source).resolve()
 
 def walk_source_files(repo_root : Path) -> list[SourceFile]:
