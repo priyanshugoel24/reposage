@@ -93,11 +93,10 @@ using API default.
 - /ingest stores source alongside the summary (extending summary_store.py's schema again — same "just re-ingest old repos, don't migrate" approach as before is fine here)
 
 
-
-DuplicateIDError observed ingesting https://github.com/pypa/sampleproject.git
-(fresh repo, first ingest) — did NOT reproduce on medmemory-mcp across many
-re-ingests. Claude Code's claim that this is a generic pre-existing bug is
-unverified — never actually confirmed by checking out a prior commit. Needs
-investigation: is sampleproject producing two chunks with identical
-(file_path, symbol_name, start_line), which would collide under the Day 3
-chunk_id hashing scheme? Check before assuming this is unrelated to today's changes.
+DuplicateIDError: investigated and could NOT reproduce. Directly tested
+re-ingesting an existing repo_name (medmemory-mcp) twice — both times
+returned a clean 200 with no error, backend log showed nothing unusual.
+The Day 12 report from Claude Code claiming this error occurred was never
+substantiated with an actual traceback and appears to have been an
+unverified guess. Treating this as resolved / non-issue unless it
+reproduces again with an actual stack trace in hand.

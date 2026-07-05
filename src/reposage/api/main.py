@@ -1,3 +1,4 @@
+from reposage.indexing.summary_store import list_repos
 import time
 
 from fastapi import FastAPI, HTTPException
@@ -164,3 +165,8 @@ def query(request: QueryRequest) -> QueryResponse:
     github_url = github_url_for(stored["source"]) if stored else None
 
     return QueryResponse(**answer, github_url=github_url)
+
+
+@app.get("/repos", response_model=list[str])
+def list_ingested_repos() -> list[str]:
+    return list_repos()

@@ -25,3 +25,10 @@ def github_url_for(source: str) -> str | None:
     if url.endswith(".git"):
         url = url[: -len(".git")]
     return url
+
+
+def list_repos() -> list[str]:
+    if not SUMMARY_PATH.exists():
+        return []
+    data = json.loads(SUMMARY_PATH.read_text())
+    return list(data.keys())

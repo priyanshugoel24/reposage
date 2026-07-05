@@ -38,6 +38,16 @@ interface ErrorResponse {
 
 export class ApiError extends Error {}
 
+export async function getRepos(): Promise<string[]> {
+  const response = await fetch(`${API_URL}/repos`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch repos: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
 export async function ingestRepo(source: string, repo_name: string): Promise<IngestResponse> {
   const response = await fetch(`${API_URL}/ingest`, {
     method: "POST",

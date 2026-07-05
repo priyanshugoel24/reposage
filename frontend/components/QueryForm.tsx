@@ -7,15 +7,14 @@ import CitationCard from "@/components/CitationCard";
 
 interface QueryFormProps {
   repoName: string | null;
+  disabled: boolean;
 }
 
-export default function QueryForm({ repoName }: QueryFormProps) {
+export default function QueryForm({ repoName, disabled }: QueryFormProps) {
   const [question, setQuestion] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const disabled = !repoName;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
