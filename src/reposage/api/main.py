@@ -1,6 +1,7 @@
 import time
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from reposage.ingestion.loader import load_repo, walk_source_files
@@ -10,6 +11,13 @@ from reposage.indexing.vectorstore import get_collection, query_collection, upse
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 
 app = FastAPI(title="RepoSage")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class IngestRequest(BaseModel):
