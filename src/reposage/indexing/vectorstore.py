@@ -2,8 +2,9 @@ import chromadb
 from chromadb.utils import embedding_functions
 from pathlib import Path
 from reposage.indexing.chunk import Chunk
+import os
 
-CHROMA_PATH = Path(".chroma")
+CHROMA_PATH = Path(os.getenv("REPOSAGE_DATA_DIR", ".")) / ".chroma"
 
 
 embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(

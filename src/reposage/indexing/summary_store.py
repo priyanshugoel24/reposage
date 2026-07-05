@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
+import os
 
-SUMMARY_PATH = Path(".reposage_summaries.json")
+SUMMARY_PATH = Path(os.getenv("REPOSAGE_DATA_DIR", ".")) / "reposage_summaries.json"
 
 def save_summary(repo_name : str, source : str, summary : str) :
     data = {}
