@@ -63,7 +63,13 @@ def synthesize_answer(question : str, results : list[dict]) -> dict :
 
     answer_text = response.text
     citations = [
-        f"{r['file_path']}:{r['start_line']}-{r['end_line']}" for r in results
+        {
+            "file_path": r["file_path"],
+            "start_line": r["start_line"],
+            "end_line": r["end_line"],
+            "source_code": r["source_code"],
+        }
+        for r in results
     ]
 
     return {

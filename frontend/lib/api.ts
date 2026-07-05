@@ -18,10 +18,18 @@ export interface IngestResponse {
   summary: string;
 }
 
+export interface Citation {
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  source_code: string;
+}
+
 export interface QueryResponse {
   answer: string;
-  citations: string[];
+  citations: Citation[];
   low_confidence: boolean;
+  github_url: string | null;
 }
 
 interface ErrorResponse {

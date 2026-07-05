@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from reposage.ingestion.loader import load_repo, walk_source_files
 from reposage.indexing.chunk import build_chunks
-from reposage.indexing.summary_store import get_summary, save_summary
+from reposage.indexing.summary_store import get_summary, github_url_for, save_summary
 from reposage.indexing.vectorstore import get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 
@@ -44,10 +44,18 @@ class QueryRequest(BaseModel):
     n_results: int = 5
 
 
+class Citation(BaseModel):
+    file_path: str
+    start_line: int
+    end_line: int
+    source_code: str
+
+
 class QueryResponse(BaseModel):
     answer: str
-    citations: list[str]
+    citations: list[Citation]
     low_confidence: bool
+    github_url: str | None
 
 
 class HealthResponse(BaseModel):
@@ -97,7 +105,7 @@ def ingest(request: IngestRequest) -> IngestResponse:
 
     chunk_dicts = [_chunk_to_dict(chunk) for chunk in chunks]
     summary = generate_repo_summary(chunk_dicts)
-    save_summary(request.repo_name, summary)
+    save_summary(request.repo_name, request.source, summary)
 
     return IngestResponse(
         repo_name=request.repo_name,
@@ -110,15 +118,15 @@ def ingest(request: IngestRequest) -> IngestResponse:
 
 @app.get("/summary/{repo_name}", response_model=SummaryResponse)
 def get_repo_summary(repo_name: str) -> SummaryResponse:
-    summary = get_summary(repo_name)
+    stored = get_summary(repo_name)
 
-    if summary is None:
+    if stored is None:
         raise HTTPException(
             status_code=404,
             detail=f"No summary found for repo '{repo_name}'. Call /ingest first.",
         )
 
-    return SummaryResponse(repo_name=repo_name, summary=summary)
+    return SummaryResponse(repo_name=repo_name, summary=stored["summary"])
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -151,4 +159,8 @@ def query(request: QueryRequest) -> QueryResponse:
     ]
 
     answer = synthesize_answer(request.question, retrieved)
-    return QueryResponse(**answer)
+
+    stored = get_summary(request.repo_name)
+    github_url = github_url_for(stored["source"]) if stored else None
+
+    return QueryResponse(**answer, github_url=github_url)

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { ApiError, queryRepo, QueryResponse } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
+import CitationCard from "@/components/CitationCard";
 
 interface QueryFormProps {
   repoName: string | null;
@@ -78,11 +79,15 @@ export default function QueryForm({ repoName }: QueryFormProps) {
           </div>
 
           {result.citations.length > 0 && (
-            <ul className="list-inside list-disc pt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              {result.citations.map((citation) => (
-                <li key={citation}>{citation}</li>
+            <div className="flex flex-col gap-2 pt-2">
+              {result.citations.map((citation, index) => (
+                <CitationCard
+                  key={`${citation.file_path}-${citation.start_line}-${index}`}
+                  citation={citation}
+                  githubUrl={result.github_url}
+                />
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}

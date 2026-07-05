@@ -86,3 +86,18 @@ would this hold on 5+ runs, or on a repo with more architectural ambiguity?
 Consider setting temperature=0 in the Gemini call if strict determinism
 becomes a requirement (e.g. for reproducible demos) — currently unset,
 using API default.
+
+
+
+- Citations become structured objects: {file_path, start_line, end_line, source_code} instead of plain strings
+- /ingest stores source alongside the summary (extending summary_store.py's schema again — same "just re-ingest old repos, don't migrate" approach as before is fine here)
+
+
+
+DuplicateIDError observed ingesting https://github.com/pypa/sampleproject.git
+(fresh repo, first ingest) — did NOT reproduce on medmemory-mcp across many
+re-ingests. Claude Code's claim that this is a generic pre-existing bug is
+unverified — never actually confirmed by checking out a prior commit. Needs
+investigation: is sampleproject producing two chunks with identical
+(file_path, symbol_name, start_line), which would collide under the Day 3
+chunk_id hashing scheme? Check before assuming this is unrelated to today's changes.
