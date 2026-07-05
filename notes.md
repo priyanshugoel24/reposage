@@ -122,3 +122,13 @@ https://reposage-production-b926.up.railway.app
 Confirmed working: /health, /ingest (slow, ~118s on free tier), /query
 (fast, full citations). CORS still needs updating with the Vercel URL
 once frontend is deployed (see earlier note).
+
+
+Day 14 complete — RepoSage fully deployed and verified end-to-end in
+production:
+  Frontend: https://reposage-two.vercel.app
+  Backend:  https://reposage-production-b926.up.railway.app
+Verified live: health check, query against existing repo (citations +
+GitHub links working), fresh ingestion through the UI (~2min on Railway
+free tier), query against freshly-ingested repo. All core v1 functionality
+confirmed working in production, not just localhost.
