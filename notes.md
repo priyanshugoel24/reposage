@@ -76,3 +76,13 @@ regardless of size. "Bigger" is not the same as "architecturally important."
   parenthetical. If citations need to be parsed programmatically (e.g. for
   the clickable-link idea above), the parser needs to tolerate this variance
   rather than assume strict compliance.
+
+
+Summary generation is non-deterministic in *phrasing* across identical
+ingests (expected — LLM sampling). Verified on 2 runs of medmemory-mcp that
+this does NOT extend to factual contradiction between runs — both correctly
+identified Next.js + FastAPI + AI document ingestion. Not yet stress-tested:
+would this hold on 5+ runs, or on a repo with more architectural ambiguity?
+Consider setting temperature=0 in the Gemini call if strict determinism
+becomes a requirement (e.g. for reproducible demos) — currently unset,
+using API default.

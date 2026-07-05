@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { checkHealth } from "@/lib/api";
 import IngestForm from "@/components/IngestForm";
+import QueryForm from "@/components/QueryForm";
 
 export default function Home() {
   const [status, setStatus] = useState("checking...");
+  const [repoName, setRepoName] = useState<string | null>(null);
 
   useEffect(() => {
     checkHealth()
@@ -23,7 +25,8 @@ export default function Home() {
           Point it at a repo. Ask it anything.
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-500">{status}</p>
-        <IngestForm />
+        <IngestForm onIngested={setRepoName} />
+        <QueryForm repoName={repoName} />
       </main>
     </div>
   );

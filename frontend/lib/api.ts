@@ -18,6 +18,12 @@ export interface IngestResponse {
   summary: string;
 }
 
+export interface QueryResponse {
+  answer: string;
+  citations: string[];
+  low_confidence: boolean;
+}
+
 interface ErrorResponse {
   detail: string;
 }
@@ -29,6 +35,21 @@ export async function ingestRepo(source: string, repo_name: string): Promise<Ing
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source, repo_name }),
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}
+
+export async function queryRepo(repo_name: string, question: string): Promise<QueryResponse> {
+  const response = await fetch(`${API_URL}/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_name, question, n_results: 5 }),
   });
 
   if (!response.ok) {

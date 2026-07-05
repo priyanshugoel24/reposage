@@ -4,7 +4,11 @@ import { FormEvent, useState } from "react";
 import { ApiError, ingestRepo, IngestResponse } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 
-export default function IngestForm() {
+interface IngestFormProps {
+  onIngested: (repoName: string) => void;
+}
+
+export default function IngestForm({ onIngested }: IngestFormProps) {
   const [source, setSource] = useState("");
   const [repoName, setRepoName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +26,7 @@ export default function IngestForm() {
     try {
       const response = await ingestRepo(source, repoName);
       setResult(response);
+      onIngested(response.repo_name);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to reach the server.");
     } finally {
