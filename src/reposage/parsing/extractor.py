@@ -27,6 +27,12 @@ LANGUAGE_BY_EXTENSION = {
     ".jsx" : ("javascript", JS_LANGUAGE)
 }
 
+CALL_NODE_TYPES = {
+    "python" : {"call"},
+    "javascript" : {"call_expression"},
+    "typescript" : {"call_expression"}
+}
+
 COMPONENT_VALUE_TYPES = {"arrow_function", "function_expression"}
 
 
@@ -36,6 +42,77 @@ class Definition :
     node_type  : str
     start_line : int
     end_line : int
+
+@dataclass
+class CallEdge:
+    caller_name : str
+    callee_name : str
+    line : int
+
+def _extract_callee_name(function_node : Node) -> str | None:
+    if function_node.type == "identifier":
+        return function_node.text.decode("utf8")
+    if function_node.type == "attribute":
+        attr = function_node.child_by_field_name("attribute")
+        return attr.text.decode("utf8") if attr else None
+    if function_node.type == "member_expression":
+        prop = function_node.child_by_field_name("property")
+        return prop.text.decode("utf8") if prop else None
+    return None
+
+
+def extract_calls(source_code : bytes, extension : str) -> list[CallEdge]:
+    lang_key, language = LANGUAGE_BY_EXTENSION[extension]
+    target_def_types = DEFINITION_NODES[lang_key]
+    target_call_types = CALL_NODE_TYPES[lang_key]
+
+    parser = Parser(language)
+    tree = parser.parse(source_code)
+
+
+    edges : list[CallEdge] = []
+    stack = ["<module>"]
+
+
+    def walk(node : Node):
+        entered_scope = False
+
+        if node.type in target_def_types:
+            stack.append(_find_name(node) or "<anonymous>")
+            entered_scope = True
+        elif node.type == "variable_declarator" and lang_key in ("javascript", "typescript"):
+            value_node = node.child_by_field_name("value")
+            name_node = node.child_by_field_name("name")
+
+            if value_node is not None and value_node.type in COMPONENT_VALUE_TYPES and name_node is not None:
+                stack.append(name_node.text.decode("utf8"))
+                entered_scope = True
+
+        
+        if node.type in target_call_types:
+            function_node = node.child_by_field_name("function")
+            if function_node is not None:
+                callee_name = _extract_callee_name(function_node)
+                if callee_name :
+                    edges.append(CallEdge(
+                        caller_name = stack[-1],
+                        callee_name = callee_name,
+                        line = node.start_point[0] + 1
+                    ))
+
+
+        for child in node.children:
+            walk(child)
+
+        if entered_scope:
+            stack.pop()
+
+    walk(tree.root_node)
+    return edges
+
+def parse_calls(path : Path) -> list[CallEdge]:
+    source_code = path.read_bytes()
+    return extract_calls(source_code, path.suffix)
 
 
 def _find_name(node : Node) -> str | None :
