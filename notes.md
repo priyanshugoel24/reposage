@@ -132,3 +132,17 @@ Verified live: health check, query against existing repo (citations +
 GitHub links working), fresh ingestion through the UI (~2min on Railway
 free tier), query against freshly-ingested repo. All core v1 functionality
 confirmed working in production, not just localhost.
+
+
+Cross-file call resolution (Day 16) uses direct Python module-to-path
+conversion for import matching. Known gaps, not yet tested:
+- Relative imports (`from . import x`, `from .. import y`) — not handled,
+  would need proper relative-path resolution against the importing file's
+  own location.
+- Star imports (`from x import *`) — a call could resolve to anything in
+  the starred module, but current logic only matches explicit import
+  paths, so a star-imported symbol would likely fall through to the
+  ambiguous/full-candidate-list path incorrectly, even when unambiguous.
+- JS/TS imports use best-effort relative-path string matching, not full
+  path resolution (no .tsx/.ts extension inference, no index-file
+  handling) — flagged back when extract_imports was written, still true.
