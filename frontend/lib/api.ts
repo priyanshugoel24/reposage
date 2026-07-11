@@ -77,3 +77,42 @@ export async function queryRepo(repo_name: string, question: string): Promise<Qu
 
   return response.json();
 }
+
+export interface AmbiguousDiagramResponse {
+  ambiguous: true;
+  candidates: string[];
+}
+
+export interface DiagramResponse {
+  ambiguous: false;
+  mermaid: string;
+  node_count: number;
+  edge_count: number;
+  truncated: boolean;
+  qualified_name: string;
+}
+
+export type GetDiagramResponse = AmbiguousDiagramResponse | DiagramResponse;
+
+export async function getDiagram(
+  repo_name: string,
+  function_name: string,
+  max_depth?: number
+): Promise<GetDiagramResponse> {
+  const response = await fetch(`${API_URL}/diagram`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      repo_name,
+      function_name,
+      ...(max_depth !== undefined ? { max_depth } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

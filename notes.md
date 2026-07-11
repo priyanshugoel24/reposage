@@ -161,3 +161,12 @@ could be a call pattern our extraction still misses (e.g. calls inside a
 try/except or comprehension not properly scoped), or could be genuinely
 correct if these functions truly aren't called anywhere in this repo
 snapshot. Worth checking manually if this becomes user-facing.
+
+DiagramForm shows 3 overlapping "Generating..." indicators during the
+ambiguous->resolved flow (main button, standalone text, dropdown Generate
+button) instead of one clean loading state. Likely cause: separate loading
+state variables for the initial ambiguous-check request and the follow-up
+resolved-diagram request aren't being properly unified/cleared. Worth
+fixing properly (consolidate to one loading state) rather than just
+hiding the extra text — could indicate a real state bug, not purely
+cosmetic.

@@ -10,6 +10,8 @@ from reposage.indexing.chunk import build_chunks
 from reposage.indexing.summary_store import get_summary, github_url_for, save_summary
 from reposage.indexing.vectorstore import get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
+from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph
+from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
 
 app = FastAPI(title="RepoSage")
 
@@ -63,6 +65,26 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class DiagramRequest(BaseModel):
+    repo_name: str
+    function_name: str
+    max_depth: int = 2
+
+
+class AmbiguousDiagramResponse(BaseModel):
+    ambiguous: bool
+    candidates: list[str]
+
+
+class DiagramResponse(BaseModel):
+    ambiguous: bool
+    mermaid: str
+    node_count: int
+    edge_count: int
+    truncated: bool
+    qualified_name: str
+
+
 def _chunk_to_dict(chunk) -> dict:
     return {
         "file_path": chunk.file_path,
@@ -103,6 +125,9 @@ def ingest(request: IngestRequest) -> IngestResponse:
 
     collection = get_collection(request.repo_name)
     upsert_chunks(collection, chunks)
+
+    call_graph = build_call_graph(source_files)
+    save_call_graph(request.repo_name, call_graph)
 
     chunk_dicts = [_chunk_to_dict(chunk) for chunk in chunks]
     summary = generate_repo_summary(chunk_dicts)
@@ -170,3 +195,43 @@ def query(request: QueryRequest) -> QueryResponse:
 @app.get("/repos", response_model=list[str])
 def list_ingested_repos() -> list[str]:
     return list_repos()
+
+
+@app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)
+def diagram(request: DiagramRequest) -> DiagramResponse | AmbiguousDiagramResponse:
+    graph = load_call_graph(request.repo_name)
+
+    if graph is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repo '{request.repo_name}' has not been ingested yet.",
+        )
+
+    candidates = [
+        qname for qname, data in graph.nodes(data=True)
+        if data.get("name") == request.function_name
+    ]
+
+    if request.function_name in graph.nodes:
+        qualified_name = request.function_name
+    elif not candidates:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No function named '{request.function_name}' found in this repo.",
+        )
+    elif len(candidates) == 1:
+        qualified_name = candidates[0]
+    else:
+        return AmbiguousDiagramResponse(ambiguous=True, candidates=candidates)
+
+    subgraph = trace_subgraph(graph, qualified_name, max_depth=request.max_depth)
+    result = generate_flow_diagram(subgraph, qualified_name)
+
+    return DiagramResponse(
+        ambiguous=False,
+        mermaid=result["mermaid"],
+        node_count=result["node_count"],
+        edge_count=result["edge_count"],
+        truncated=result["truncated"],
+        qualified_name=qualified_name,
+    )
