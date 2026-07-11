@@ -1,5 +1,12 @@
+from networkx.generators import directed
 import networkx as nx
 from reposage.parsing.extractor import (parse_calls, parse_imports, build_symbol_table, resolve_calls_for_file)
+import json
+import os
+from pathlib import Path
+from networkx.readwrite import json_graph
+
+GRAPH_DIR = Path(os.getenv("REPOSAGE_DATA_DIR", "."))/"call_graphs"
 
 
 def _qualified_name(file_path : str, func_name : str) -> str:
@@ -36,3 +43,42 @@ def build_call_graph(files : list) -> nx.DiGraph:
                 graph.add_edge(caller_qname, callee_qname, line=r.line, ambiguous=len(r.resolved_files) > 1)
 
     return graph
+
+def save_call_graph(repo_name : str, graph : nx.DiGraph):
+    GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    data = json_graph.node_link_data(graph)
+    path = GRAPH_DIR / f"{repo_name}.json"
+    path.write_text(json.dumps(data))
+
+def load_call_graph(repo_name : str) -> nx.DiGraph | None:
+    path = GRAPH_DIR / f"{repo_name}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    return json_graph.node_link_graph(data, directed=True)
+
+
+def get_callers(graph : nx.DiGraph, qualified_name : str) -> list[str]:
+    """Who calls this function"""
+
+    if qualified_name not in graph:
+        return []
+    return list(graph.predecessors(qualified_name))
+
+def get_callees(graph : nx.DiGraph, qualified_name : str) -> list[str]:
+    """What does this function call"""
+    if qualified_name not in graph:
+        return []
+    return list(graph.successors(qualified_name))
+
+
+def trace_path(graph : nx.DiGraph, start : str, end : str) -> list[str] | None:
+    """Find a call path from start to end, if one exists."""
+
+    if start not in graph or end not in graph:
+        return None
+    try:
+        return nx.shortest_path(graph, source=start, target=end)
+    except nx.NetworkXNoPath:
+        return None
+
