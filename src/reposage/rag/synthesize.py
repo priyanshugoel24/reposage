@@ -112,4 +112,4 @@ def generate_repo_summary(all_chunks : list[dict]) -> str:
         config = {"system_instruction" : SUMMARY_SYSTEM_INSTRUCTION}
     )
 
-    return response.text
+    return response.text or ""

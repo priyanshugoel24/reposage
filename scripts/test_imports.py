@@ -7,4 +7,4 @@ server_path = repo_root / "medmemory" / "server.py"
 
 imports = parse_imports(server_path)
 for imp in imports:
-    print(imp.module_path)
+    print(f"{imp.module_path} | imported={imp.imported_name} | alias={imp.alias}")

@@ -53,6 +53,8 @@ class CallEdge:
 @dataclass
 class ImportInfo:
     module_path : str
+    imported_name: str | None = None  
+    alias: str | None = None 
 
 
 @dataclass
@@ -66,15 +68,19 @@ class ResolvedCall:
 def _module_to_filepath(module_path : str) -> str:
     return module_path.replace(".", "/") + ".py"
 
+def _node_text(node : Node) -> str:
+    """Safely decode a tree-sitter node's text bytes, returning '' if None."""
+    return node.text.decode("utf8") if node.text is not None else ""
+
 def _extract_callee_name(function_node : Node) -> str | None:
     if function_node.type == "identifier":
-        return function_node.text.decode("utf8")
+        return _node_text(function_node)
     if function_node.type == "attribute":
         attr = function_node.child_by_field_name("attribute")
-        return attr.text.decode("utf8") if attr else None
+        return _node_text(attr) if attr else None
     if function_node.type == "member_expression":
         prop = function_node.child_by_field_name("property")
-        return prop.text.decode("utf8") if prop else None
+        return _node_text(prop) if prop else None
     return None
 
 
@@ -102,7 +108,7 @@ def extract_calls(source_code : bytes, extension : str) -> list[CallEdge]:
             name_node = node.child_by_field_name("name")
 
             if value_node is not None and value_node.type in COMPONENT_VALUE_TYPES and name_node is not None:
-                stack.append(name_node.text.decode("utf8"))
+                stack.append(_node_text(name_node))
                 entered_scope = True
 
         
@@ -135,7 +141,7 @@ def parse_calls(path : Path) -> list[CallEdge]:
 def _find_name(node : Node) -> str | None :
     name_node = node.child_by_field_name("name")
     if name_node is not None:
-        return name_node.text.decode("utf8")
+        return _node_text(name_node)
     return None
 
 def extract_definitions(source_code : bytes, extension : str) -> list[Definition]:
@@ -162,7 +168,7 @@ def extract_definitions(source_code : bytes, extension : str) -> list[Definition
             name_node = node.child_by_field_name("name")
             if value_node is not None and value_node.type in COMPONENT_VALUE_TYPES and name_node is not None:
                 definitions.append(Definition(
-                    name = name_node.text.decode("utf8"),
+                    name = _node_text(name_node),
                     node_type = f"const_{value_node.type}",
                     start_line = node.start_point[0] + 1,
                     end_line = node.end_point[0] + 1,
@@ -191,28 +197,40 @@ def build_symbol_table(files : list) -> dict[str, list[str]]:
     return dict(table)
 
 
-def extract_imports(source_code : bytes, extension : str) -> list[ImportInfo]:
+def extract_imports(source_code: bytes, extension: str) -> list[ImportInfo]:
     lang_key, language = LANGUAGE_BY_EXTENSION[extension]
     parser = Parser(language)
     tree = parser.parse(source_code)
 
+    imports: list[ImportInfo] = []
 
-    imports : list[ImportInfo] = []
+    def walk(node: Node):
+        if lang_key == "python" and node.type == "import_from_statement":
+            module_node = node.child_by_field_name("module_name")
+            module_path = _node_text(module_node) if module_node else ""
 
-
-    def walk(node : Node):
-        if lang_key == "python" and node.type in ("import_statement", "import_from_statement"):
-            module_node = node.child_by_field_name("module_name") or node.child_by_field_name("name")
-
+            for child in node.children:
+                if child.type == "dotted_name" and child != module_node:
+                    # plain (non-aliased) imported name
+                    name = _node_text(child)
+                    imports.append(ImportInfo(module_path=module_path, imported_name=name))
+                elif child.type == "aliased_import":
+                    name_node = child.child_by_field_name("name")
+                    alias_node = child.child_by_field_name("alias")
+                    if name_node is not None and alias_node is not None:
+                        imports.append(ImportInfo(
+                            module_path=module_path,
+                            imported_name=_node_text(name_node),
+                            alias=_node_text(alias_node),
+                        ))
+        elif node.type == "import_statement":
+            module_node = node.child_by_field_name("name")
             if module_node is not None:
-                imports.append(ImportInfo(module_path=module_node.text.decode("utf8")))
+                imports.append(ImportInfo(module_path=_node_text(module_node)))
         elif lang_key in ("javascript", "typescript") and node.type == "import_statement":
             source_node = node.child_by_field_name("source")
-
             if source_node is not None:
-
-                #strip quotes from the string node
-                raw = source_node.text.decode("utf8")
+                raw = _node_text(source_node)
                 imports.append(ImportInfo(module_path=raw.strip("'\"")))
 
         for child in node.children:
@@ -227,34 +245,41 @@ def parse_imports(path : Path) -> list[ImportInfo]:
     return extract_imports(source_code, path.suffix)
 
 
-def resolve_calls_for_file(file_relative_path : str, edges : list[CallEdge], imports : list[ImportInfo], symbol_table : dict[str, list[str]],) -> list[ResolvedCall]:
-
+def resolve_calls_for_file(
+    file_relative_path: str,
+    edges: list[CallEdge],
+    imports: list[ImportInfo],
+    symbol_table: dict[str, list[str]],
+) -> list[ResolvedCall]:
     imported_files = {_module_to_filepath(imp.module_path) for imp in imports}
+    alias_to_real = {imp.alias: imp.imported_name for imp in imports if imp.alias and imp.imported_name is not None}
 
-    resolved : list[ResolvedCall] = []
-
+    resolved: list[ResolvedCall] = []
     for edge in edges:
-        candidates = symbol_table.get(edge.callee_name, [])
+        was_alias = edge.callee_name in alias_to_real
+        lookup_name = alias_to_real.get(edge.callee_name, edge.callee_name)
+        candidates = symbol_table.get(lookup_name, [])
         if not candidates:
-            continue  #not defined anywhere in the repo - external/library call, drop it
+            continue
 
-        reachable = [
-            c for c in candidates if c == file_relative_path or c in imported_files
-        ]
-
-
-        #if import-based filtering eliminates everything (e.g. a same-file helper the symbol table found under a different relative path format), fall back to the full candidate list rather than silently dropping a real edge
+        if was_alias:
+            # an alias unambiguously points at the imported symbol —
+            # exclude the same-file rule, only match against imports
+            reachable = [c for c in candidates if c in imported_files]
+        else:
+            reachable = [
+                c for c in candidates
+                if c == file_relative_path or c in imported_files
+            ]
 
         final_candidates = reachable if reachable else candidates
 
-
         resolved.append(ResolvedCall(
-            caller_name = edge.caller_name,
-            caller_file = file_relative_path,
-            callee_name = edge.callee_name,
-            resolved_files = final_candidates,
-            line = edge.line,
+            caller_name=edge.caller_name,
+            caller_file=file_relative_path,
+            callee_name=lookup_name,
+            resolved_files=final_candidates,
+            line=edge.line,
         ))
-
 
     return resolved
