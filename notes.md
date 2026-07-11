@@ -170,3 +170,13 @@ resolved-diagram request aren't being properly unified/cleared. Worth
 fixing properly (consolidate to one loading state) rather than just
 hiding the extra text — could indicate a real state bug, not purely
 cosmetic.
+
+
+Call graphs are built once at /ingest time and persisted to disk
+(call_graphs/{repo_name}.json). If extraction/resolution logic changes
+after a repo was ingested (e.g. the aliased-import fix), that repo's
+saved graph becomes stale and silently wrong until it's re-ingested.
+No automatic invalidation exists. This bit us three times during Day
+18-21 testing alone. If this becomes a real product (not just a demo),
+consider: versioning the graph format, or invalidating/rebuilding graphs
+automatically when the underlying parsing code changes.

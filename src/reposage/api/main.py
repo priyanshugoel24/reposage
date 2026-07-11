@@ -12,6 +12,7 @@ from reposage.indexing.vectorstore import get_collection, query_collection, upse
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph
 from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
+from reposage.graph.codebase_map import detect_entry_points, build_module_graph, suggest_reading_order
 
 app = FastAPI(title="RepoSage")
 
@@ -83,6 +84,18 @@ class DiagramResponse(BaseModel):
     edge_count: int
     truncated: bool
     qualified_name: str
+
+
+class ModuleEdge(BaseModel):
+    source: str
+    target: str
+    call_count: int
+
+
+class CodebaseMapResponse(BaseModel):
+    entry_points: list[str]
+    module_edges: list[ModuleEdge]
+    reading_order: list[str]
 
 
 def _chunk_to_dict(chunk) -> dict:
@@ -195,6 +208,32 @@ def query(request: QueryRequest) -> QueryResponse:
 @app.get("/repos", response_model=list[str])
 def list_ingested_repos() -> list[str]:
     return list_repos()
+
+
+@app.get("/codebase-map/{repo_name}", response_model=CodebaseMapResponse)
+def codebase_map(repo_name: str) -> CodebaseMapResponse:
+    graph = load_call_graph(repo_name)
+
+    if graph is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repo '{repo_name}' has not been ingested yet.",
+        )
+
+    entry_points = detect_entry_points(graph)
+    module_graph = build_module_graph(graph)
+    reading_order = suggest_reading_order(module_graph, entry_points)
+
+    module_edges = [
+        ModuleEdge(source=source, target=target, call_count=data["call_count"])
+        for source, target, data in module_graph.edges(data=True)
+    ]
+
+    return CodebaseMapResponse(
+        entry_points=entry_points,
+        module_edges=module_edges,
+        reading_order=reading_order,
+    )
 
 
 @app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)
