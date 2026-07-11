@@ -18,6 +18,8 @@ for _, callee, data in graph.out_edges(target, data=True):
 
 save_call_graph("medmemory-mcp", graph)
 loaded = load_call_graph("medmemory-mcp")
+if loaded is None:
+    raise RuntimeError("Failed to load call graph for 'medmemory-mcp'. Ensure it was saved correctly.")
 
 print(f"Loaded graph: {loaded.number_of_nodes()} nodes, {loaded.number_of_edges()} edges")
 

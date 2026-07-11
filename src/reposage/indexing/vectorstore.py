@@ -1,7 +1,10 @@
 import chromadb
+from chromadb import EmbeddingFunction
+from chromadb.api.types import Embeddable
 from chromadb.utils import embedding_functions
 from pathlib import Path
 from reposage.indexing.chunk import Chunk
+from typing import cast
 import os
 
 CHROMA_PATH = Path(os.getenv("REPOSAGE_DATA_DIR", ".")) / ".chroma"
@@ -16,8 +19,7 @@ def get_collection(repo_name : str) :
     client = chromadb.PersistentClient(path = str(CHROMA_PATH))
     return client.get_or_create_collection(
         name = repo_name,
-        embedding_function=embedding_fn,
-    
+        embedding_function=cast(EmbeddingFunction[Embeddable], embedding_fn),
     )
 
 
