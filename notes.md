@@ -146,3 +146,18 @@ conversion for import matching. Known gaps, not yet tested:
 - JS/TS imports use best-effort relative-path string matching, not full
   path resolution (no .tsx/.ts extension inference, no index-file
   handling) — flagged back when extract_imports was written, still true.
+
+
+Aliased Python imports (`from x import y as z`) are now correctly
+resolved — the alias is traced back to the real function name for symbol
+lookup, and same-file name collisions are excluded when resolution came
+from an alias (since the alias is unambiguous evidence of intent).
+Verified via generate_health_summary, which uses three aliased imports.
+
+Entry-point false positives remaining after alias fix: insert_visit and
+insert_vaccination still show as unreached in both database.py and
+database_hosted.py. Root cause not yet investigated — could be dead code,
+could be a call pattern our extraction still misses (e.g. calls inside a
+try/except or comprehension not properly scoped), or could be genuinely
+correct if these functions truly aren't called anywhere in this repo
+snapshot. Worth checking manually if this becomes user-facing.

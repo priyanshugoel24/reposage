@@ -4,10 +4,17 @@ from reposage.graph.codebase_map import (
     build_module_graph,
     suggest_reading_order,
 )
+from reposage.ingestion.loader import load_repo, walk_source_files
+from reposage.graph.call_graph import build_call_graph, save_call_graph
 
-graph = load_call_graph("medmemory-mcp")
-if graph is None:
-    raise RuntimeError("Failed to load call graph for 'medmemory-mcp'.")
+repo_root = load_repo("https://github.com/priyanshugoel24/medmemory-mcp")
+files = walk_source_files(repo_root)
+graph = build_call_graph(files)
+save_call_graph("medmemory-mcp", graph)
+
+# graph = load_call_graph("medmemory-mcp")
+# if graph is None:
+#     raise RuntimeError("Failed to load call graph for 'medmemory-mcp'.")
 
 entry_points = detect_entry_points(graph)
 print(f"Entry points ({len(entry_points)}):")
