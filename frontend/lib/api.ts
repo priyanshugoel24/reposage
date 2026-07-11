@@ -1,7 +1,16 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// The Auth.js CSRF cookie is httpOnly, so it can't be read from document.cookie.
+// Auth.js's own /api/auth/csrf endpoint hands back the matching token value,
+// which the FastAPI backend expects in the X-XSRF-Token header on state-changing requests.
+async function getCsrfHeaders(): Promise<Record<string, string>> {
+  const response = await fetch("/api/auth/csrf", { credentials: "include" });
+  const { csrfToken } = await response.json();
+  return { "X-XSRF-Token": csrfToken };
+}
+
 export async function checkHealth(): Promise<unknown> {
-  const response = await fetch(`${API_URL}/health`);
+  const response = await fetch(`${API_URL}/health`, { credentials: "include" });
 
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.status} ${response.statusText}`);
@@ -39,7 +48,7 @@ interface ErrorResponse {
 export class ApiError extends Error {}
 
 export async function getRepos(): Promise<string[]> {
-  const response = await fetch(`${API_URL}/repos`);
+  const response = await fetch(`${API_URL}/repos`, { credentials: "include" });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch repos: ${response.status} ${response.statusText}`);
@@ -51,7 +60,8 @@ export async function getRepos(): Promise<string[]> {
 export async function ingestRepo(source: string, repo_name: string): Promise<IngestResponse> {
   const response = await fetch(`${API_URL}/ingest`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await getCsrfHeaders()) },
+    credentials: "include",
     body: JSON.stringify({ source, repo_name }),
   });
 
@@ -66,7 +76,8 @@ export async function ingestRepo(source: string, repo_name: string): Promise<Ing
 export async function queryRepo(repo_name: string, question: string): Promise<QueryResponse> {
   const response = await fetch(`${API_URL}/query`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await getCsrfHeaders()) },
+    credentials: "include",
     body: JSON.stringify({ repo_name, question, n_results: 5 }),
   });
 
@@ -101,7 +112,8 @@ export async function getDiagram(
 ): Promise<GetDiagramResponse> {
   const response = await fetch(`${API_URL}/diagram`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await getCsrfHeaders()) },
+    credentials: "include",
     body: JSON.stringify({
       repo_name,
       function_name,
@@ -130,7 +142,9 @@ export interface CodebaseMapResponse {
 }
 
 export async function getCodebaseMap(repo_name: string): Promise<CodebaseMapResponse> {
-  const response = await fetch(`${API_URL}/codebase-map/${encodeURIComponent(repo_name)}`);
+  const response = await fetch(`${API_URL}/codebase-map/${encodeURIComponent(repo_name)}`, {
+    credentials: "include",
+  });
 
   if (!response.ok) {
     const body: ErrorResponse = await response.json();

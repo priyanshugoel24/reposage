@@ -1,4 +1,3 @@
-from reposage.indexing.summary_store import list_repos
 from functools import lru_cache
 import time
 
@@ -9,9 +8,10 @@ from fastapi_nextauth_jwt import NextAuthJWT
 from fastapi_nextauth_jwt.exceptions import NextAuthJWTException
 from pydantic import BaseModel
 
+from reposage.db.models import SessionLocal, User, init_db
 from reposage.ingestion.loader import load_repo, walk_source_files
 from reposage.indexing.chunk import build_chunks
-from reposage.indexing.summary_store import get_summary, github_url_for, save_summary
+from reposage.indexing.summary_store import get_summary, github_url_for, list_repos, save_summary
 from reposage.indexing.vectorstore import get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph
@@ -28,6 +28,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+
+
 @lru_cache
 def get_jwt_auth() -> NextAuthJWT:
     return NextAuthJWT()
@@ -36,6 +42,28 @@ def get_jwt_auth() -> NextAuthJWT:
 @app.exception_handler(NextAuthJWTException)
 def nextauth_jwt_exception_handler(request: Request, exc: NextAuthJWTException) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
+def get_current_user(request: Request, jwt_auth: NextAuthJWT = Depends(get_jwt_auth)) -> User:
+    claims = jwt_auth(request)
+    sub = claims.get("sub")
+    if sub is None:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = int(sub)
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if user is None:
+            user = User(
+                id=user_id,
+                username=claims.get("name") or f"user_{user_id}",
+                email=claims.get("email"),
+                avatar_url=claims.get("picture"),
+            )
+            session.add(user)
+            session.commit()
+        return user
 
 
 class IngestRequest(BaseModel):
@@ -134,7 +162,7 @@ def whoami(request: Request, jwt_auth: NextAuthJWT = Depends(get_jwt_auth)) -> d
 
 
 @app.post("/ingest", response_model=IngestResponse)
-def ingest(request: IngestRequest) -> IngestResponse:
+def ingest(request: IngestRequest, current_user: User = Depends(get_current_user)) -> IngestResponse:
     start = time.monotonic()
 
     try:
@@ -155,15 +183,22 @@ def ingest(request: IngestRequest) -> IngestResponse:
             build_chunks(source_file.path, source_file.relative_path, source_file.last_modified)
         )
 
-    collection = get_collection(request.repo_name)
+    collection = get_collection(current_user.id, request.repo_name)
     upsert_chunks(collection, chunks)
 
     call_graph = build_call_graph(source_files)
-    save_call_graph(request.repo_name, call_graph)
+    save_call_graph(current_user.id, request.repo_name, call_graph)
 
     chunk_dicts = [_chunk_to_dict(chunk) for chunk in chunks]
     summary = generate_repo_summary(chunk_dicts)
-    save_summary(request.repo_name, request.source, summary)
+    save_summary(
+        current_user.id,
+        request.repo_name,
+        request.source,
+        summary,
+        files_processed=len(source_files),
+        chunks_created=len(chunks),
+    )
 
     return IngestResponse(
         repo_name=request.repo_name,
@@ -175,27 +210,25 @@ def ingest(request: IngestRequest) -> IngestResponse:
 
 
 @app.get("/summary/{repo_name}", response_model=SummaryResponse)
-def get_repo_summary(repo_name: str) -> SummaryResponse:
-    stored = get_summary(repo_name)
+def get_repo_summary(repo_name: str, current_user: User = Depends(get_current_user)) -> SummaryResponse:
+    stored = get_summary(current_user.id, repo_name)
 
     if stored is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No summary found for repo '{repo_name}'. Call /ingest first.",
-        )
+        raise HTTPException(status_code=404, detail=f"Repo '{repo_name}' not found.")
 
     return SummaryResponse(repo_name=repo_name, summary=stored["summary"])
 
 
 @app.post("/query", response_model=QueryResponse)
-def query(request: QueryRequest) -> QueryResponse:
-    collection = get_collection(request.repo_name)
+def query(request: QueryRequest, current_user: User = Depends(get_current_user)) -> QueryResponse:
+    stored = get_summary(current_user.id, request.repo_name)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=f"Repo '{request.repo_name}' not found.")
+
+    collection = get_collection(current_user.id, request.repo_name)
 
     if collection.count() == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Repo '{request.repo_name}' has not been ingested yet. Call /ingest first.",
-        )
+        raise HTTPException(status_code=404, detail=f"Repo '{request.repo_name}' not found.")
 
     results = query_collection(collection, request.question, n_results=request.n_results)
 
@@ -218,26 +251,22 @@ def query(request: QueryRequest) -> QueryResponse:
 
     answer = synthesize_answer(request.question, retrieved)
 
-    stored = get_summary(request.repo_name)
     github_url = github_url_for(stored["source"]) if stored else None
 
     return QueryResponse(**answer, github_url=github_url)
 
 
 @app.get("/repos", response_model=list[str])
-def list_ingested_repos() -> list[str]:
-    return list_repos()
+def list_ingested_repos(current_user: User = Depends(get_current_user)) -> list[str]:
+    return list_repos(current_user.id)
 
 
 @app.get("/codebase-map/{repo_name}", response_model=CodebaseMapResponse)
-def codebase_map(repo_name: str) -> CodebaseMapResponse:
-    graph = load_call_graph(repo_name)
+def codebase_map(repo_name: str, current_user: User = Depends(get_current_user)) -> CodebaseMapResponse:
+    graph = load_call_graph(current_user.id, repo_name)
 
     if graph is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Repo '{repo_name}' has not been ingested yet.",
-        )
+        raise HTTPException(status_code=404, detail=f"Repo '{repo_name}' not found.")
 
     entry_points = detect_entry_points(graph)
     module_graph = build_module_graph(graph)
@@ -256,14 +285,11 @@ def codebase_map(repo_name: str) -> CodebaseMapResponse:
 
 
 @app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)
-def diagram(request: DiagramRequest) -> DiagramResponse | AmbiguousDiagramResponse:
-    graph = load_call_graph(request.repo_name)
+def diagram(request: DiagramRequest, current_user: User = Depends(get_current_user)) -> DiagramResponse | AmbiguousDiagramResponse:
+    graph = load_call_graph(current_user.id, request.repo_name)
 
     if graph is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Repo '{request.repo_name}' has not been ingested yet.",
-        )
+        raise HTTPException(status_code=404, detail=f"Repo '{request.repo_name}' not found.")
 
     candidates = [
         qname for qname, data in graph.nodes(data=True)

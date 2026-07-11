@@ -44,14 +44,14 @@ def build_call_graph(files : list) -> nx.DiGraph:
 
     return graph
 
-def save_call_graph(repo_name : str, graph : nx.DiGraph):
+def save_call_graph(user_id : int, repo_name : str, graph : nx.DiGraph):
     GRAPH_DIR.mkdir(parents=True, exist_ok=True)
     data = json_graph.node_link_data(graph)
-    path = GRAPH_DIR / f"{repo_name}.json"
+    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
     path.write_text(json.dumps(data))
 
-def load_call_graph(repo_name : str) -> nx.DiGraph | None:
-    path = GRAPH_DIR / f"{repo_name}.json"
+def load_call_graph(user_id : int, repo_name : str) -> nx.DiGraph | None:
+    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
     if not path.exists():
         return None
     data = json.loads(path.read_text())

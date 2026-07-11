@@ -15,10 +15,10 @@ embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
     
 )
 
-def get_collection(repo_name : str) :
+def get_collection(user_id : int, repo_name : str) :
     client = chromadb.PersistentClient(path = str(CHROMA_PATH))
     return client.get_or_create_collection(
-        name = repo_name,
+        name = f"user_{user_id}_{repo_name}",
         embedding_function=cast(EmbeddingFunction[Embeddable], embedding_fn),
     )
 

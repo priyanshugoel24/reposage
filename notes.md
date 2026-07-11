@@ -180,3 +180,9 @@ No automatic invalidation exists. This bit us three times during Day
 18-21 testing alone. If this becomes a real product (not just a demo),
 consider: versioning the graph format, or invalidating/rebuilding graphs
 automatically when the underlying parsing code changes.
+
+scripts/test_call_graph.py, test_codebase_map.py, test_flow_diagram.py,
+test_synthesize.py, test_indexing.py, test_query.py now call functions
+with outdated signatures (missing required user_id param) after the
+Phase 1 Task 2 DB/multi-tenant migration. Not fixed yet — revisit when
+next touching call-graph/vectorstore code (likely Phase 3).

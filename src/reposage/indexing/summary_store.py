@@ -1,22 +1,9 @@
-import json
-from pathlib import Path
-import os
+from datetime import datetime, timezone
 
-SUMMARY_PATH = Path(os.getenv("REPOSAGE_DATA_DIR", ".")) / "reposage_summaries.json"
+from sqlalchemy import select
 
-def save_summary(repo_name : str, source : str, summary : str) :
-    data = {}
-    if SUMMARY_PATH.exists():
-        data = json.loads(SUMMARY_PATH.read_text())
-    data[repo_name] = {"source": source, "summary": summary}
-    SUMMARY_PATH.write_text(json.dumps(data, indent = 2))
+from reposage.db.models import Repo, SessionLocal
 
-def get_summary(repo_name : str) -> dict | None:
-    if not SUMMARY_PATH.exists():
-        return None
-
-    data = json.loads(SUMMARY_PATH.read_text())
-    return data.get(repo_name)
 
 def github_url_for(source: str) -> str | None:
     if not (source.startswith("http://github.com/") or source.startswith("https://github.com/")):
@@ -28,8 +15,57 @@ def github_url_for(source: str) -> str | None:
     return url
 
 
-def list_repos() -> list[str]:
-    if not SUMMARY_PATH.exists():
-        return []
-    data = json.loads(SUMMARY_PATH.read_text())
-    return list(data.keys())
+def save_summary(
+    user_id: int,
+    repo_name: str,
+    source: str,
+    summary: str,
+    files_processed: int,
+    chunks_created: int,
+) -> None:
+    with SessionLocal() as session:
+        existing = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if existing is not None:
+            existing.source_url = source
+            existing.github_url = github_url_for(source)
+            existing.summary = summary
+            existing.files_processed = files_processed
+            existing.chunks_created = chunks_created
+            existing.ingested_at = datetime.now(timezone.utc)
+        else:
+            session.add(
+                Repo(
+                    user_id=user_id,
+                    repo_name=repo_name,
+                    source_url=source,
+                    github_url=github_url_for(source),
+                    summary=summary,
+                    files_processed=files_processed,
+                    chunks_created=chunks_created,
+                )
+            )
+        session.commit()
+
+
+def get_summary(user_id: int, repo_name: str) -> dict | None:
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if repo is None:
+            return None
+        return {
+            "source": repo.source_url,
+            "summary": repo.summary,
+            "github_url": repo.github_url,
+            "files_processed": repo.files_processed,
+            "chunks_created": repo.chunks_created,
+        }
+
+
+def list_repos(user_id: int) -> list[str]:
+    with SessionLocal() as session:
+        rows = session.scalars(select(Repo.repo_name).where(Repo.user_id == user_id))
+        return list(rows)
