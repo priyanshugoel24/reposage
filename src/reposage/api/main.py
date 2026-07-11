@@ -1,8 +1,12 @@
 from reposage.indexing.summary_store import list_repos
+from functools import lru_cache
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi_nextauth_jwt import NextAuthJWT
+from fastapi_nextauth_jwt.exceptions import NextAuthJWTException
 from pydantic import BaseModel
 
 from reposage.ingestion.loader import load_repo, walk_source_files
@@ -19,9 +23,19 @@ app = FastAPI(title="RepoSage")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://reposage-two.vercel.app"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@lru_cache
+def get_jwt_auth() -> NextAuthJWT:
+    return NextAuthJWT()
+
+
+@app.exception_handler(NextAuthJWTException)
+def nextauth_jwt_exception_handler(request: Request, exc: NextAuthJWTException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
 class IngestRequest(BaseModel):
@@ -112,6 +126,11 @@ def _chunk_to_dict(chunk) -> dict:
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok")
+
+
+@app.get("/auth/whoami")
+def whoami(request: Request, jwt_auth: NextAuthJWT = Depends(get_jwt_auth)) -> dict:
+    return jwt_auth(request)
 
 
 @app.post("/ingest", response_model=IngestResponse)

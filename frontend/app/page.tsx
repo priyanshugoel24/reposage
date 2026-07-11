@@ -7,6 +7,8 @@ import QueryForm from "@/components/QueryForm";
 import DiagramForm from "@/components/DiagramForm";
 import CodebaseMapView from "@/components/CodebaseMapView";
 import RepoSelector from "@/components/RepoSelector";
+import AuthWidget from "@/components/AuthWidget";
+import AuthDebugButton from "@/components/AuthDebugButton";
 
 export default function Home() {
   const [status, setStatus] = useState("checking...");
@@ -39,6 +41,7 @@ export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-4 py-32 px-16 bg-white text-center dark:bg-black">
+        <AuthWidget />
         <h1 className="text-4xl font-semibold tracking-tight text-black dark:text-zinc-50">
           RepoSage
         </h1>
@@ -57,6 +60,7 @@ export default function Home() {
         <QueryForm key={selectedRepo} repoName={selectedRepo} disabled={repos.length === 0} />
         <DiagramForm key={`diagram-${selectedRepo}`} repoName={selectedRepo} disabled={repos.length === 0} />
         <CodebaseMapView key={`codebase-map-${selectedRepo}`} repoName={selectedRepo} disabled={repos.length === 0} />
+        <AuthDebugButton />
       </main>
     </div>
   );
