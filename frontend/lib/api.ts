@@ -116,3 +116,26 @@ export async function getDiagram(
 
   return response.json();
 }
+
+export interface ModuleEdge {
+  source: string;
+  target: string;
+  call_count: number;
+}
+
+export interface CodebaseMapResponse {
+  entry_points: string[];
+  module_edges: ModuleEdge[];
+  reading_order: string[];
+}
+
+export async function getCodebaseMap(repo_name: string): Promise<CodebaseMapResponse> {
+  const response = await fetch(`${API_URL}/codebase-map/${encodeURIComponent(repo_name)}`);
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

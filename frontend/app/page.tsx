@@ -5,6 +5,7 @@ import { checkHealth } from "@/lib/api";
 import IngestForm from "@/components/IngestForm";
 import QueryForm from "@/components/QueryForm";
 import DiagramForm from "@/components/DiagramForm";
+import CodebaseMapView from "@/components/CodebaseMapView";
 import RepoSelector from "@/components/RepoSelector";
 
 export default function Home() {
@@ -55,6 +56,7 @@ export default function Home() {
         <IngestForm onIngested={handleIngested} />
         <QueryForm key={selectedRepo} repoName={selectedRepo} disabled={repos.length === 0} />
         <DiagramForm key={`diagram-${selectedRepo}`} repoName={selectedRepo} disabled={repos.length === 0} />
+        <CodebaseMapView key={`codebase-map-${selectedRepo}`} repoName={selectedRepo} disabled={repos.length === 0} />
       </main>
     </div>
   );
