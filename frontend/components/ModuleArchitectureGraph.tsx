@@ -20,6 +20,8 @@ interface ModuleArchitectureGraphProps {
   repoName: string | null;
   disabled: boolean;
   onAskInChat: (question: string) => void;
+  initialSelectedNodeId?: string | null;
+  onInitialNodeConsumed?: () => void;
 }
 
 const NODE_WIDTH = 180;
@@ -211,7 +213,13 @@ function ModuleDetailPanel({
   );
 }
 
-export default function ModuleArchitectureGraph({ repoName, disabled, onAskInChat }: ModuleArchitectureGraphProps) {
+export default function ModuleArchitectureGraph({
+  repoName,
+  disabled,
+  onAskInChat,
+  initialSelectedNodeId,
+  onInitialNodeConsumed,
+}: ModuleArchitectureGraphProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<ArchitectureGraphResponse | null>(null);
@@ -247,6 +255,21 @@ export default function ModuleArchitectureGraph({ repoName, disabled, onAskInCha
       cancelled = true;
     };
   }, [repoName, disabled]);
+
+  useEffect(() => {
+    if (!initialSelectedNodeId || !graphData) return;
+
+    const matchedNode = graphData.nodes.find((node) => node.id === initialSelectedNodeId);
+    if (matchedNode) {
+      setSelectedNodeId(matchedNode.id);
+    } else {
+      console.warn(
+        `ModuleArchitectureGraph: initialSelectedNodeId "${initialSelectedNodeId}" does not match any node in the loaded graph.`
+      );
+    }
+    onInitialNodeConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectedNodeId, graphData]);
 
   const layout = useMemo(() => (graphData ? layoutGraph(graphData) : null), [graphData]);
 

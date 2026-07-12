@@ -210,3 +210,17 @@ phase only established the visual language.
 Architecture module graph edge-weight labels use React Flow's default
 white-box styling, not themed to match the terminal design system.
 Cosmetic only — revisit during a later polish pass.
+
+
+Citation-to-architecture-graph linking (Phase 5) only works for files that
+contain at least one parseable function/class definition. Files with zero
+definitions (pure top-level scripts, e.g. seed_hosted.py) get a whole-file
+citation chunk (Day 3's fallback) but never become a node in any call
+graph or architecture graph (Days 15-17's node creation is symbol-table-
+only). "View in architecture" correctly no-ops with a console warning for
+these — not a bug, a real boundary between the chunking and call-graph
+subsystems. If this needs closing later: either add definition-less files
+as isolated/disconnected nodes in build_call_graph, or hide the "View in
+architecture" button entirely for citations whose file_path isn't a known
+graph node (would need the frontend to know the node-id set up front,
+which it currently only discovers after fetching the graph).

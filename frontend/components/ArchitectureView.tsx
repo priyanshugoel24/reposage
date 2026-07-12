@@ -14,6 +14,8 @@ interface ArchitectureViewProps {
   onReingested: (repoName: string) => void;
   onRemoved: (repoName: string) => void;
   onAskInChat: (question: string) => void;
+  initialSelectedNodeId?: string | null;
+  onInitialNodeConsumed?: () => void;
 }
 
 type Tab = "graph" | "tools";
@@ -25,6 +27,8 @@ export default function ArchitectureView({
   onReingested,
   onRemoved,
   onAskInChat,
+  initialSelectedNodeId,
+  onInitialNodeConsumed,
 }: ArchitectureViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>("graph");
 
@@ -73,7 +77,13 @@ export default function ArchitectureView({
             <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-text-muted">
               Module architecture graph
             </h2>
-            <ModuleArchitectureGraph repoName={repoName} disabled={disabled} onAskInChat={onAskInChat} />
+            <ModuleArchitectureGraph
+              repoName={repoName}
+              disabled={disabled}
+              onAskInChat={onAskInChat}
+              initialSelectedNodeId={initialSelectedNodeId}
+              onInitialNodeConsumed={onInitialNodeConsumed}
+            />
           </section>
         )}
 

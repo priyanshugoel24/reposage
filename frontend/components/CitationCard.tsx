@@ -13,6 +13,7 @@ interface CitationCardProps {
   index?: number;
   isExpanded: boolean;
   onToggle: () => void;
+  onViewInArchitecture?: (filePath: string) => void;
 }
 
 function languageForFile(filePath: string): string {
@@ -37,6 +38,7 @@ export default function CitationCard({
   index,
   isExpanded,
   onToggle,
+  onViewInArchitecture,
 }: CitationCardProps) {
   const { file_path, start_line, end_line, source_code } = citation;
   const language = languageForFile(file_path);
@@ -79,9 +81,23 @@ export default function CitationCard({
             </span>
           )}
         </div>
-        <span className="shrink-0 pl-2 font-mono text-xs text-text-muted">
-          lines {start_line}–{end_line}
-        </span>
+        <div className="flex shrink-0 items-center gap-3 pl-2">
+          {onViewInArchitecture && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewInArchitecture(file_path);
+              }}
+              className="font-mono text-xs text-text-muted hover:text-accent"
+            >
+              View in architecture
+            </button>
+          )}
+          <span className="font-mono text-xs text-text-muted">
+            lines {start_line}–{end_line}
+          </span>
+        </div>
       </div>
 
       {isExpanded && (

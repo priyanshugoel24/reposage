@@ -50,6 +50,12 @@ export default function Home() {
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [activeView, setActiveView] = useState<View>("repos");
   const [pendingChatQuestion, setPendingChatQuestion] = useState<string | null>(null);
+  const [pendingArchitectureNodeId, setPendingArchitectureNodeId] = useState<string | null>(null);
+
+  function handleViewInArchitecture(nodeId: string) {
+    setPendingArchitectureNodeId(nodeId);
+    setActiveView("architecture");
+  }
 
   useEffect(() => {
     if (!session) return;
@@ -122,6 +128,7 @@ export default function Home() {
             onRemoved={handleRepoDeleted}
             initialQuestion={pendingChatQuestion}
             onInitialQuestionConsumed={() => setPendingChatQuestion(null)}
+            onViewInArchitecture={handleViewInArchitecture}
           />
         )}
         {activeView === "architecture" && (
@@ -136,6 +143,8 @@ export default function Home() {
               setPendingChatQuestion(question);
               setActiveView("chat");
             }}
+            initialSelectedNodeId={pendingArchitectureNodeId}
+            onInitialNodeConsumed={() => setPendingArchitectureNodeId(null)}
           />
         )}
         {activeView === "tour" && (

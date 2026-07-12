@@ -14,6 +14,7 @@ interface QueryFormProps {
   onRemoved: (repoName: string) => void;
   initialQuestion?: string | null;
   onInitialQuestionConsumed?: () => void;
+  onViewInArchitecture?: (nodeId: string) => void;
 }
 
 export default function QueryForm({
@@ -24,6 +25,7 @@ export default function QueryForm({
   onRemoved,
   initialQuestion,
   onInitialQuestionConsumed,
+  onViewInArchitecture,
 }: QueryFormProps) {
   const [question, setQuestion] = useState("");
   const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export default function QueryForm({
                 index={index}
                 isExpanded={expandedIndices.has(index)}
                 onToggle={() => toggleCitation(index)}
+                onViewInArchitecture={onViewInArchitecture}
               />
             ))}
           </div>
