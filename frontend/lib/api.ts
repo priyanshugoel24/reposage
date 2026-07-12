@@ -1,4 +1,8 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// Routed through the Next.js rewrite in next.config.ts (source: /api/backend/:path*),
+// which proxies to BACKEND_URL server-side. This keeps the browser same-origin with the
+// backend so the Auth.js session cookie (scoped to this frontend's domain) is attached
+// automatically, instead of trying to send a cross-domain cookie to Render directly.
+const API_URL = "/api/backend";
 
 // The Auth.js CSRF cookie is httpOnly, so it can't be read from document.cookie.
 // Auth.js's own /api/auth/csrf endpoint hands back the matching token value,
