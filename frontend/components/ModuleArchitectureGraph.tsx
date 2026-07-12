@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ApiError, ArchitectureGraphResponse, ArchitectureTier, getArchitectureGraph } from "@/lib/api";
+import { useHighlightedGraph } from "@/lib/graphHighlight";
 
 interface ModuleArchitectureGraphProps {
   repoName: string | null;
@@ -26,7 +27,7 @@ const NODE_HEIGHT = 56;
 const MIN_SIZE = 140;
 const MAX_SIZE = 260;
 
-const TIER_STYLES: Record<ArchitectureTier, React.CSSProperties> = {
+export const TIER_STYLES: Record<ArchitectureTier, React.CSSProperties> = {
   entry_point: {
     background: "var(--color-accent)",
     color: "var(--color-accent-foreground)",
@@ -44,7 +45,7 @@ const TIER_STYLES: Record<ArchitectureTier, React.CSSProperties> = {
   },
 };
 
-function layoutGraph(
+export function layoutGraph(
   graph: ArchitectureGraphResponse
 ): { nodes: Node[]; edges: Edge[] } {
   const dagreGraph = new dagre.graphlib.Graph();
@@ -92,13 +93,13 @@ function layoutGraph(
   return { nodes, edges };
 }
 
-const TIER_LABELS: Record<ArchitectureTier, string> = {
+export const TIER_LABELS: Record<ArchitectureTier, string> = {
   entry_point: "Entry point",
   core_service: "Core service",
   utility: "Utility",
 };
 
-function Legend() {
+export function Legend() {
   const items: { tier: ArchitectureTier; label: string }[] = [
     { tier: "entry_point", label: TIER_LABELS.entry_point },
     { tier: "core_service", label: TIER_LABELS.core_service },
@@ -264,64 +265,12 @@ export default function ModuleArchitectureGraph({ repoName, disabled, onAskInCha
     [graphData, selectedNodeId]
   );
 
-  const connectivity = useMemo(() => {
-    if (!selectedNodeId || !graphData) return null;
-    const connectedNodeIds = new Set<string>([selectedNodeId]);
-    const connectedEdgeIds = new Set<string>();
-    let dependencyCount = 0;
-    let dependentCount = 0;
-    for (const edge of graphData.edges) {
-      if (edge.source === selectedNodeId) {
-        connectedNodeIds.add(edge.target);
-        connectedEdgeIds.add(`${edge.source}-${edge.target}`);
-        dependencyCount += 1;
-      }
-      if (edge.target === selectedNodeId) {
-        connectedNodeIds.add(edge.source);
-        connectedEdgeIds.add(`${edge.source}-${edge.target}`);
-        dependentCount += 1;
-      }
-    }
-    return { connectedNodeIds, connectedEdgeIds, dependencyCount, dependentCount };
-  }, [selectedNodeId, graphData]);
-
-  const displayNodes = useMemo(() => {
-    return nodes.map((node) => {
-      const isSelected = connectivity !== null && node.id === selectedNodeId;
-      const isConnected = connectivity === null || connectivity.connectedNodeIds.has(node.id);
-      const baseBorder = (node.style as { border?: string } | undefined)?.border;
-
-      return {
-        ...node,
-        style: {
-          ...node.style,
-          opacity: isConnected ? 1 : 0.25,
-          boxShadow: isSelected
-            ? "0 0 0 2px var(--color-accent), 0 0 14px var(--color-accent)"
-            : "none",
-          border: isSelected ? "1px solid var(--color-accent)" : baseBorder,
-        },
-      };
-    });
-  }, [nodes, connectivity, selectedNodeId]);
-
-  const displayEdges = useMemo(() => {
-    if (!connectivity) return edges;
-    return edges.map((edge) => {
-      const isConnected = connectivity.connectedEdgeIds.has(edge.id);
-      return {
-        ...edge,
-        style: {
-          ...edge.style,
-          opacity: isConnected ? 1 : 0.15,
-          stroke: isConnected ? "var(--color-accent)" : (edge.style as { stroke?: string } | undefined)?.stroke,
-        },
-        markerEnd: isConnected
-          ? { type: MarkerType.ArrowClosed, color: "var(--color-accent)" }
-          : edge.markerEnd,
-      };
-    });
-  }, [edges, connectivity]);
+  const { displayNodes, displayEdges, connectivity } = useHighlightedGraph(
+    nodes,
+    edges,
+    graphData?.edges ?? [],
+    selectedNodeId
+  );
 
   function handleNodeClick(nodeId: string) {
     setSelectedNodeId((current) => (current === nodeId ? null : nodeId));

@@ -236,3 +236,30 @@ export async function getArchitectureGraph(repo_name: string): Promise<Architect
 
   return response.json();
 }
+
+export interface TourStep {
+  module_id: string;
+  label: string;
+  tier: ArchitectureTier;
+  title: string;
+  narration: string;
+  key_functions: string[];
+  function_count: number;
+}
+
+export interface TourResponse {
+  steps: TourStep[];
+}
+
+export async function getTour(repo_name: string): Promise<TourResponse> {
+  const response = await fetch(`${API_URL}/tour/${encodeURIComponent(repo_name)}`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

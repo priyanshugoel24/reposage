@@ -4,18 +4,19 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { RepoInfo } from "@/lib/api";
 
-export type View = "repos" | "chat" | "architecture";
+export type View = "repos" | "chat" | "architecture" | "tour";
 
 interface NavItemConfig {
   view: View;
   label: string;
-  icon: "dot" | "diamond";
+  icon: "dot" | "diamond" | "square";
 }
 
 const NAV_ITEMS: NavItemConfig[] = [
   { view: "repos", label: "My Repos", icon: "dot" },
   { view: "chat", label: "Chat", icon: "dot" },
   { view: "architecture", label: "Architecture", icon: "diamond" },
+  { view: "tour", label: "Explore Tour", icon: "square" },
 ];
 
 interface SidebarProps {
@@ -31,6 +32,13 @@ function NavIcon({ icon, active }: { icon: NavItemConfig["icon"]; active: boolea
   const colorClass = active ? "text-accent" : "text-text-muted";
   if (icon === "diamond") {
     return <span className={`${colorClass} inline-block rotate-45 h-2 w-2 border border-current`} />;
+  }
+  if (icon === "square") {
+    return (
+      <span
+        className={`${colorClass} inline-block h-2 w-2 ${active ? "bg-accent" : "border border-current"}`}
+      />
+    );
   }
   return (
     <span

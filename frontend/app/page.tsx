@@ -7,6 +7,7 @@ import Sidebar, { View } from "@/components/Sidebar";
 import ReposDashboard from "@/components/ReposDashboard";
 import QueryForm from "@/components/QueryForm";
 import ArchitectureView from "@/components/ArchitectureView";
+import ExploreTourView from "@/components/ExploreTourView";
 import AuthDebugButton from "@/components/AuthDebugButton";
 
 function SignInScreen() {
@@ -131,6 +132,18 @@ export default function Home() {
             disabled={repos.length === 0}
             onReingested={handleIngested}
             onRemoved={handleRepoDeleted}
+            onAskInChat={(question) => {
+              setPendingChatQuestion(question);
+              setActiveView("chat");
+            }}
+          />
+        )}
+        {activeView === "tour" && (
+          <ExploreTourView
+            key={`tour-${selectedRepo}`}
+            repoName={selectedRepo}
+            disabled={repos.length === 0}
+            onExitTour={() => setActiveView("architecture")}
             onAskInChat={(question) => {
               setPendingChatQuestion(question);
               setActiveView("chat");
