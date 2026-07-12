@@ -8,7 +8,6 @@ import ReposDashboard from "@/components/ReposDashboard";
 import QueryForm from "@/components/QueryForm";
 import ArchitectureView from "@/components/ArchitectureView";
 import ExploreTourView from "@/components/ExploreTourView";
-import AuthDebugButton from "@/components/AuthDebugButton";
 
 function SignInScreen() {
   return (
@@ -158,11 +157,6 @@ export default function Home() {
               setActiveView("chat");
             }}
           />
-        )}
-        {activeView === "repos" && (
-          <div className="px-10 pb-6">
-            <AuthDebugButton />
-          </div>
         )}
       </main>
     </div>

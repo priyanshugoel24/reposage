@@ -3,6 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 import json
 import math
+import os
 import time
 
 import networkx as nx
@@ -62,7 +63,11 @@ def on_startup() -> None:
 
 @lru_cache
 def get_jwt_auth() -> NextAuthJWT:
-    return NextAuthJWT()
+    # Render sets RENDER=true automatically in deployed services; use it to mirror the
+    # frontend's NODE_ENV-gated secure-cookie switch, so the expected cookie name
+    # ("__Secure-authjs.session-token" in production, "authjs.session-token" locally)
+    # always matches what the frontend actually sets.
+    return NextAuthJWT(secure_cookie=os.environ.get("RENDER") == "true")
 
 
 @app.exception_handler(NextAuthJWTException)
