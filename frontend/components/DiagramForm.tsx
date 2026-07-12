@@ -35,6 +35,7 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDark = useIsDarkMode();
+  const isResolvingCandidate = Boolean(result?.ambiguous);
 
   async function runDiagram(name: string) {
     if (isLoading || disabled || !repoName || !name) return;
@@ -98,11 +99,13 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
           disabled={disabled || isLoading}
           className="rounded-md bg-accent px-4 py-2 font-mono text-sm font-bold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? "Generating..." : "Show diagram"}
+          {isLoading && !isResolvingCandidate ? "Generating..." : "Show diagram"}
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-text-muted">Generating...</p>}
+      {isLoading && !isResolvingCandidate && (
+        <p className="text-sm text-text-muted">Generating...</p>
+      )}
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
