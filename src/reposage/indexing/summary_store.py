@@ -35,6 +35,7 @@ def save_summary(
             existing.files_processed = files_processed
             existing.chunks_created = chunks_created
             existing.language = language
+            existing.tour_steps = None
             existing.ingested_at = datetime.now(timezone.utc)
         else:
             session.add(
@@ -85,6 +86,25 @@ def list_repos(user_id: int) -> list[dict]:
             }
             for repo in rows
         ]
+
+
+def get_tour_steps(user_id: int, repo_name: str) -> str | None:
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        return repo.tour_steps if repo is not None else None
+
+
+def save_tour_steps(user_id: int, repo_name: str, tour_steps: str) -> None:
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if repo is None:
+            return
+        repo.tour_steps = tour_steps
+        session.commit()
 
 
 def delete_repo(user_id: int, repo_name: str) -> bool:

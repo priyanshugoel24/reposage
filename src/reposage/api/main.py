@@ -1,6 +1,7 @@
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+import json
 import math
 import time
 
@@ -15,15 +16,25 @@ from pydantic import BaseModel
 from reposage.db.models import SessionLocal, User, init_db
 from reposage.ingestion.loader import detect_primary_language, load_repo, walk_source_files
 from reposage.indexing.chunk import build_chunks
-from reposage.indexing.summary_store import delete_repo, get_summary, github_url_for, list_repos, save_summary
+from reposage.indexing.summary_store import (
+    delete_repo,
+    get_summary,
+    get_tour_steps,
+    github_url_for,
+    list_repos,
+    save_summary,
+    save_tour_steps,
+)
 from reposage.indexing.vectorstore import delete_collection, get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
+from reposage.rag.tour import generate_tour_narration
 from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph, delete_call_graph
 from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
 from reposage.graph.codebase_map import (
     detect_entry_points,
     detect_module_level_entry_points,
     build_module_graph,
+    order_tour_stops,
     suggest_reading_order,
 )
 
@@ -184,6 +195,20 @@ class ArchitectureGraphResponse(BaseModel):
     edges: list[ArchitectureEdge]
 
 
+class TourStep(BaseModel):
+    module_id: str
+    label: str
+    tier: str
+    title: str
+    narration: str
+    key_functions: list[str]
+    function_count: int
+
+
+class TourResponse(BaseModel):
+    steps: list[TourStep]
+
+
 def _chunk_to_dict(chunk) -> dict:
     return {
         "file_path": chunk.file_path,
@@ -342,8 +367,28 @@ def codebase_map(repo_name: str, current_user: User = Depends(get_current_user))
     )
 
 
-@app.get("/architecture-graph/{repo_name}", response_model=ArchitectureGraphResponse)
-def architecture_graph(repo_name: str, current_user: User = Depends(get_current_user)) -> ArchitectureGraphResponse:
+class ArchitectureData:
+    def __init__(
+        self,
+        graph: nx.DiGraph,
+        module_graph: nx.DiGraph,
+        entry_files: set[str],
+        centrality: dict[str, float],
+        tier_by_node: dict[str, str],
+        functions_by_file: dict[str, list[str]],
+    ) -> None:
+        self.graph = graph
+        self.module_graph = module_graph
+        self.entry_files = entry_files
+        self.centrality = centrality
+        self.tier_by_node = tier_by_node
+        self.functions_by_file = functions_by_file
+
+
+def _build_architecture_data(repo_name: str, current_user: User) -> ArchitectureData:
+    """Load the call graph and compute the module graph, entry points, normalized
+    PageRank centrality, and tiers once, shared by /architecture-graph and /tour.
+    Raises HTTPException(404) if the repo or module graph isn't available."""
     graph = load_call_graph(current_user.id, repo_name)
 
     if graph is None:
@@ -375,38 +420,103 @@ def architecture_graph(repo_name: str, current_user: User = Depends(get_current_
         else None
     )
 
+    tier_by_node: dict[str, str] = {}
+    for node in module_graph.nodes:
+        if node in entry_files:
+            tier_by_node[node] = "entry_point"
+        elif core_threshold is not None and normalized[node] >= core_threshold:
+            tier_by_node[node] = "core_service"
+        else:
+            tier_by_node[node] = "utility"
+
     functions_by_file: dict[str, list[str]] = {}
     for _, data in graph.nodes(data=True):
         functions_by_file.setdefault(data["file"], []).append(data["name"])
+    for node in functions_by_file:
+        functions_by_file[node].sort()
+
+    return ArchitectureData(
+        graph=graph,
+        module_graph=module_graph,
+        entry_files=entry_files,
+        centrality=normalized,
+        tier_by_node=tier_by_node,
+        functions_by_file=functions_by_file,
+    )
+
+
+@app.get("/architecture-graph/{repo_name}", response_model=ArchitectureGraphResponse)
+def architecture_graph(repo_name: str, current_user: User = Depends(get_current_user)) -> ArchitectureGraphResponse:
+    data = _build_architecture_data(repo_name, current_user)
 
     nodes = []
-    for node in module_graph.nodes:
-        if node in entry_files:
-            tier = "entry_point"
-        elif core_threshold is not None and normalized[node] >= core_threshold:
-            tier = "core_service"
-        else:
-            tier = "utility"
-
-        module_functions = sorted(functions_by_file.get(node, []))
+    for node in data.module_graph.nodes:
+        module_functions = data.functions_by_file.get(node, [])
 
         nodes.append(
             ArchitectureNode(
                 id=node,
                 label=Path(node).name,
-                tier=tier,
-                centrality=normalized[node],
+                tier=data.tier_by_node[node],
+                centrality=data.centrality[node],
                 function_count=len(module_functions),
                 functions=module_functions[:15],
             )
         )
 
     edges = [
-        ArchitectureEdge(source=source, target=target, weight=data["call_count"])
-        for source, target, data in module_graph.edges(data=True)
+        ArchitectureEdge(source=source, target=target, weight=edge_data["call_count"])
+        for source, target, edge_data in data.module_graph.edges(data=True)
     ]
 
     return ArchitectureGraphResponse(nodes=nodes, edges=edges)
+
+
+@app.get("/tour/{repo_name}", response_model=TourResponse)
+def tour(repo_name: str, current_user: User = Depends(get_current_user)) -> TourResponse:
+    cached = get_tour_steps(current_user.id, repo_name)
+    if cached is not None:
+        return TourResponse(steps=[TourStep(**step) for step in json.loads(cached)])
+
+    data = _build_architecture_data(repo_name, current_user)
+
+    ordered_module_ids = order_tour_stops(data.module_graph, data.entry_files, data.centrality)
+
+    dependency_counts = {node: data.module_graph.out_degree(node) for node in data.module_graph.nodes}
+    dependent_counts = {node: data.module_graph.in_degree(node) for node in data.module_graph.nodes}
+
+    modules_for_narration = [
+        {
+            "file_path": module_id,
+            "tier": data.tier_by_node[module_id],
+            "functions": data.functions_by_file.get(module_id, []),
+            "function_count": len(data.functions_by_file.get(module_id, [])),
+            "dependency_count": dependency_counts[module_id],
+            "dependent_count": dependent_counts[module_id],
+        }
+        for module_id in ordered_module_ids
+    ]
+
+    narrations = generate_tour_narration(modules_for_narration)
+
+    steps = [
+        TourStep(
+            module_id=module["file_path"],
+            label=Path(module["file_path"]).name,
+            tier=module["tier"],
+            title=narration["title"],
+            narration=narration["narration"],
+            key_functions=module["functions"][:15],
+            function_count=module["function_count"],
+        )
+        for module, narration in zip(modules_for_narration, narrations)
+    ]
+
+    save_tour_steps(
+        current_user.id, repo_name, json.dumps([step.model_dump() for step in steps])
+    )
+
+    return TourResponse(steps=steps)
 
 
 @app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)

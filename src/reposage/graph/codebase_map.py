@@ -35,6 +35,24 @@ def build_module_graph(function_graph: nx.DiGraph) -> nx.DiGraph:
     return module_graph
 
 
+def order_tour_stops(
+    module_graph: nx.DiGraph, entry_files: set[str], centrality: dict[str, float]
+) -> list[str]:
+    """Order module file paths for a guided tour: entry points first (by descending
+    out-degree, since entry points have no in-edges by definition), then the rest
+    sorted by descending centrality."""
+    entry_stops = sorted(
+        entry_files, key=lambda node: (-module_graph.out_degree(node), node)
+    )
+
+    remaining = [node for node in module_graph.nodes if node not in entry_files]
+    remaining_stops = sorted(
+        remaining, key=lambda node: (-centrality.get(node, 0.0), node)
+    )
+
+    return entry_stops + remaining_stops
+
+
 def suggest_reading_order(module_graph: nx.DiGraph, entry_points: list[str]) -> list[str]:
     """Suggest a file reading order via BFS from entry-point modules."""
     entry_files = []

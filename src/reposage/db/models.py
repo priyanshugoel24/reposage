@@ -35,6 +35,7 @@ class Repo(Base):
     chunks_created: Mapped[int] = mapped_column(Integer, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     language: Mapped[str | None] = mapped_column(String, nullable=True)
+    tour_steps: Mapped[str | None] = mapped_column(Text, nullable=True)
     ingested_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -52,6 +53,8 @@ def _add_missing_columns() -> None:
         }
         if "language" not in existing_columns:
             conn.execute(text("ALTER TABLE repos ADD COLUMN language VARCHAR"))
+        if "tour_steps" not in existing_columns:
+            conn.execute(text("ALTER TABLE repos ADD COLUMN tour_steps TEXT"))
 
 
 def init_db() -> None:
