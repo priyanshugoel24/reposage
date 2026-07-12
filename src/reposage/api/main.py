@@ -290,7 +290,6 @@ def ingest(request: IngestRequest, current_user: User = Depends(get_current_user
     upsert_chunks(collection, chunks)
 
     call_graph = build_call_graph(source_files)
-    save_call_graph(current_user.id, request.repo_name, call_graph)
 
     chunk_dicts = [_chunk_to_dict(chunk) for chunk in chunks]
     summary = generate_repo_summary(chunk_dicts)
@@ -303,6 +302,9 @@ def ingest(request: IngestRequest, current_user: User = Depends(get_current_user
         chunks_created=len(chunks),
         language=language,
     )
+
+    # save_call_graph writes to the repos row, so the row must already exist (save_summary above).
+    save_call_graph(current_user.id, request.repo_name, call_graph)
 
     return IngestResponse(
         repo_name=request.repo_name,

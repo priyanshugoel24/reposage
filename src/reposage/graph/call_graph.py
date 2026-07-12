@@ -2,12 +2,11 @@ from networkx.generators import directed
 import networkx as nx
 from reposage.parsing.extractor import (parse_calls, parse_imports, build_symbol_table, resolve_calls_for_file)
 import json
-import os
 from collections import deque
-from pathlib import Path
 from networkx.readwrite import json_graph
+from sqlalchemy import select
 
-GRAPH_DIR = Path(os.getenv("REPOSAGE_DATA_DIR", "."))/"call_graphs"
+from reposage.db.models import Repo, SessionLocal
 
 
 def _qualified_name(file_path : str, func_name : str) -> str:
@@ -46,22 +45,37 @@ def build_call_graph(files : list) -> nx.DiGraph:
     return graph
 
 def save_call_graph(user_id : int, repo_name : str, graph : nx.DiGraph):
-    GRAPH_DIR.mkdir(parents=True, exist_ok=True)
     data = json_graph.node_link_data(graph)
-    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
-    path.write_text(json.dumps(data))
+    payload = json.dumps(data)
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if repo is None:
+            return
+        repo.call_graph_json = payload
+        session.commit()
 
 def load_call_graph(user_id : int, repo_name : str) -> nx.DiGraph | None:
-    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
-    if not path.exists():
-        return None
-    data = json.loads(path.read_text())
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if repo is None or repo.call_graph_json is None:
+            return None
+        data = json.loads(repo.call_graph_json)
     return json_graph.node_link_graph(data, directed=True)
 
 
 def delete_call_graph(user_id : int, repo_name : str) -> None:
-    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
-    path.unlink(missing_ok=True)
+    with SessionLocal() as session:
+        repo = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if repo is None:
+            return
+        repo.call_graph_json = None
+        session.commit()
 
 
 def get_callers(graph : nx.DiGraph, qualified_name : str) -> list[str]:

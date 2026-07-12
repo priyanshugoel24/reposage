@@ -231,3 +231,21 @@ same proven BFS mechanics as Day 18's trace_subgraph (forward direction),
 but hasn't been verified against a real multi-hop case in this repo —
 every tested function's callers turned out to be terminal entry points at
 distance 1. Revisit if a deeper repo becomes available to test against.
+
+
+
+scripts/test_chroma.py and scripts/test_repo_lifecycle.py reference the
+removed ChromaDB/file-based storage approach (pre-Phase-7 migration to
+Postgres/pgvector) and will fail if run. Not fixed — standalone dev
+scripts, not part of the running app. Rewrite or delete if needed later.
+
+
+Post-migration confidence-gate distances came back numerically nearly
+identical to pre-migration ChromaDB L2 values, not roughly halved as
+predicted by cosine-vs-L2 math for unit-normalized vectors. Threshold
+(0.75) empirically still correctly separates relevant (~0.48-0.51) from
+irrelevant (~0.88) queries — behavior is verified correct. The underlying
+reason the math prediction didn't match reality is unresolved (likely a
+wrong assumption about embedding normalization or Chroma's actual default
+metric) — not blocking, but worth understanding if distance-based logic
+is extended further.
