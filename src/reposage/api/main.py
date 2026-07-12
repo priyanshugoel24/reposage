@@ -1,7 +1,10 @@
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
+import math
 import time
 
+import networkx as nx
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,7 +20,12 @@ from reposage.indexing.vectorstore import delete_collection, get_collection, que
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph, delete_call_graph
 from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
-from reposage.graph.codebase_map import detect_entry_points, build_module_graph, suggest_reading_order
+from reposage.graph.codebase_map import (
+    detect_entry_points,
+    detect_module_level_entry_points,
+    build_module_graph,
+    suggest_reading_order,
+)
 
 app = FastAPI(title="RepoSage")
 
@@ -154,6 +162,24 @@ class CodebaseMapResponse(BaseModel):
     entry_points: list[str]
     module_edges: list[ModuleEdge]
     reading_order: list[str]
+
+
+class ArchitectureNode(BaseModel):
+    id: str
+    label: str
+    tier: str
+    centrality: float
+
+
+class ArchitectureEdge(BaseModel):
+    source: str
+    target: str
+    weight: int
+
+
+class ArchitectureGraphResponse(BaseModel):
+    nodes: list[ArchitectureNode]
+    edges: list[ArchitectureEdge]
 
 
 def _chunk_to_dict(chunk) -> dict:
@@ -312,6 +338,60 @@ def codebase_map(repo_name: str, current_user: User = Depends(get_current_user))
         module_edges=module_edges,
         reading_order=reading_order,
     )
+
+
+@app.get("/architecture-graph/{repo_name}", response_model=ArchitectureGraphResponse)
+def architecture_graph(repo_name: str, current_user: User = Depends(get_current_user)) -> ArchitectureGraphResponse:
+    graph = load_call_graph(current_user.id, repo_name)
+
+    if graph is None:
+        raise HTTPException(status_code=404, detail=f"Repo '{repo_name}' not found.")
+
+    module_graph = build_module_graph(graph)
+
+    if module_graph.number_of_nodes() == 0:
+        raise HTTPException(status_code=404, detail=f"No module graph available for repo '{repo_name}'.")
+
+    entry_files = detect_module_level_entry_points(module_graph)
+
+    pagerank = nx.pagerank(module_graph, weight="call_count")
+    scores = list(pagerank.values())
+    min_score, max_score = min(scores), max(scores)
+    score_range = max_score - min_score
+
+    normalized = {
+        node: (score - min_score) / score_range if score_range > 0 else 0.0
+        for node, score in pagerank.items()
+    }
+
+    non_entry_scores = sorted(
+        (score for node, score in normalized.items() if node not in entry_files), reverse=True
+    )
+    core_threshold = (
+        non_entry_scores[max(0, math.ceil(len(non_entry_scores) * 0.4) - 1)]
+        if non_entry_scores
+        else None
+    )
+
+    nodes = []
+    for node in module_graph.nodes:
+        if node in entry_files:
+            tier = "entry_point"
+        elif core_threshold is not None and normalized[node] >= core_threshold:
+            tier = "core_service"
+        else:
+            tier = "utility"
+
+        nodes.append(
+            ArchitectureNode(id=node, label=Path(node).name, tier=tier, centrality=normalized[node])
+        )
+
+    edges = [
+        ArchitectureEdge(source=source, target=target, weight=data["call_count"])
+        for source, target, data in module_graph.edges(data=True)
+    ]
+
+    return ArchitectureGraphResponse(nodes=nodes, edges=edges)
 
 
 @app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)

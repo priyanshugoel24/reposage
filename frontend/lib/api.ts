@@ -201,3 +201,36 @@ export async function getCodebaseMap(repo_name: string): Promise<CodebaseMapResp
 
   return response.json();
 }
+
+export type ArchitectureTier = "entry_point" | "core_service" | "utility";
+
+export interface ArchitectureNode {
+  id: string;
+  label: string;
+  tier: ArchitectureTier;
+  centrality: number;
+}
+
+export interface ArchitectureEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface ArchitectureGraphResponse {
+  nodes: ArchitectureNode[];
+  edges: ArchitectureEdge[];
+}
+
+export async function getArchitectureGraph(repo_name: string): Promise<ArchitectureGraphResponse> {
+  const response = await fetch(`${API_URL}/architecture-graph/${encodeURIComponent(repo_name)}`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

@@ -196,3 +196,17 @@ zero results everywhere, instead of a clear failure. Worth hardening
 later: get_collection could check the DB's Repo table first and raise a
 clear error if no matching row exists, rather than allowing silent
 phantom-collection creation.
+
+
+Phase 2 complete. Full visual redesign (terminal aesthetic) verified
+against Claude Design reference screenshots. Repo lifecycle (ingest/
+re-ingest/remove) available both from My Repos dashboard and from
+within Chat/Architecture views via shared RepoActionsMenu. Known
+deferred item: Explore Tour screen from the reference design has no
+functional counterpart yet — that's Phase 4's actual feature, this
+phase only established the visual language.
+
+
+Architecture module graph edge-weight labels use React Flow's default
+white-box styling, not themed to match the terminal design system.
+Cosmetic only — revisit during a later polish pass.

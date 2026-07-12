@@ -8,6 +8,11 @@ def detect_entry_points(graph: nx.DiGraph) -> list[str]:
     return [node for node in graph.nodes if graph.in_degree(node) == 0]
 
 
+def detect_module_level_entry_points(module_graph: nx.DiGraph) -> set[str]:
+    """Module nodes with no incoming edges from other modules — real entry files."""
+    return {node for node in module_graph.nodes if module_graph.in_degree(node) == 0}
+
+
 def build_module_graph(function_graph: nx.DiGraph) -> nx.DiGraph:
     """Aggregate the function-level call graph up to file level."""
     module_graph = nx.DiGraph()
