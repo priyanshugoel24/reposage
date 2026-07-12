@@ -1,18 +1,30 @@
-from sentence_transformers import SentenceTransformer
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from reposage.db.models import Chunk as ChunkRow, SessionLocal
 from reposage.indexing.chunk import Chunk
+from reposage.rag.synthesize import client
 
-_model: SentenceTransformer | None = None
+EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_DIMENSIONALITY = 768
+# The API rejects batches larger than 100 requests (BatchEmbedContentsRequest limit).
+EMBEDDING_BATCH_SIZE = 100
 
 
-def _get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+def _embed(texts: list[str]) -> list[list[float]]:
+    # The API rejects empty content parts, which occurs for empty files (e.g. bare __init__.py).
+    safe_texts = [t if t.strip() else "(empty file)" for t in texts]
+
+    embeddings: list[list[float]] = []
+    for i in range(0, len(safe_texts), EMBEDDING_BATCH_SIZE):
+        batch = safe_texts[i : i + EMBEDDING_BATCH_SIZE]
+        response = client.models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=batch,
+            config={"output_dimensionality": EMBEDDING_DIMENSIONALITY},
+        )
+        embeddings.extend(e.values for e in response.embeddings)
+    return embeddings
 
 
 class Collection:
@@ -45,8 +57,7 @@ def upsert_chunks(collection: Collection, chunks: list[Chunk]) -> None:
     if not chunks:
         return
 
-    model = _get_model()
-    embeddings = model.encode([c.source_code for c in chunks]).tolist()
+    embeddings = _embed([c.source_code for c in chunks])
 
     with SessionLocal() as session:
         for chunk, embedding in zip(chunks, embeddings):
@@ -75,8 +86,7 @@ def upsert_chunks(collection: Collection, chunks: list[Chunk]) -> None:
 
 
 def query_collection(collection: Collection, query_text: str, n_results: int = 5) -> dict:
-    model = _get_model()
-    query_embedding = model.encode([query_text])[0].tolist()
+    query_embedding = _embed([query_text])[0]
 
     distance = ChunkRow.embedding.cosine_distance(query_embedding).label("distance")
 

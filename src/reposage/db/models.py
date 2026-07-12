@@ -10,9 +10,9 @@ load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-# all-MiniLM-L6-v2 (the sentence-transformers model used throughout indexing/vectorstore.py)
-# emits 384-dim embeddings; verified via SentenceTransformer(...).get_sentence_embedding_dimension().
-EMBEDDING_DIM = 384
+# gemini-embedding-001 (used throughout indexing/vectorstore.py) is configured
+# with output_dimensionality=768 via EmbedContentConfig.
+EMBEDDING_DIM = 768
 
 
 class Base(DeclarativeBase):

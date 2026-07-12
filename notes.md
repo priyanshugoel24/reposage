@@ -249,3 +249,11 @@ reason the math prediction didn't match reality is unresolved (likely a
 wrong assumption about embedding normalization or Chroma's actual default
 metric) — not blocking, but worth understanding if distance-based logic
 is extended further.
+
+
+CONFIDENCE_THRESHOLD recalibrated for the third time (MiniLM -> pgvector
+migration -> Gemini embeddings). Current value: 0.44, based on real
+distances from 4 relevant + 2 irrelevant queries against medmemory-mcp
+(clean gap: 0.39 top-relevant vs 0.49 bottom-irrelevant). Still only
+calibrated against one repo — same limitation flagged since Day 6, never
+resolved. If embeddings change again, expect to redo this exercise.
