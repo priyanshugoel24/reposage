@@ -28,7 +28,13 @@ from reposage.indexing.summary_store import (
 from reposage.indexing.vectorstore import delete_collection, get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
 from reposage.rag.tour import generate_tour_narration
-from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph, delete_call_graph
+from reposage.graph.call_graph import (
+    build_call_graph,
+    save_call_graph,
+    load_call_graph,
+    delete_call_graph,
+    get_transitive_callers,
+)
 from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
 from reposage.graph.codebase_map import (
     detect_entry_points,
@@ -193,6 +199,33 @@ class ArchitectureEdge(BaseModel):
 class ArchitectureGraphResponse(BaseModel):
     nodes: list[ArchitectureNode]
     edges: list[ArchitectureEdge]
+
+
+class BlastRadiusNode(BaseModel):
+    id: str
+    label: str
+    distance: int | None = None
+    centrality: float | None = None
+    function_count: int | None = None
+    functions: list[str] | None = None
+
+
+class BlastRadiusEdge(BaseModel):
+    source: str
+    target: str
+    weight: int
+
+
+class BlastRadiusResponse(BaseModel):
+    ambiguous: bool
+    nodes: list[BlastRadiusNode]
+    edges: list[BlastRadiusEdge]
+    qualified_name: str
+
+
+class AmbiguousBlastRadiusResponse(BaseModel):
+    ambiguous: bool
+    candidates: list[str]
 
 
 class TourStep(BaseModel):
@@ -519,6 +552,31 @@ def tour(repo_name: str, current_user: User = Depends(get_current_user)) -> Tour
     return TourResponse(steps=steps)
 
 
+def _resolve_function_name(graph: nx.DiGraph, function_name: str) -> str | list[str]:
+    """Resolve a plain function name to a qualified name in the call graph.
+
+    Returns the qualified name if resolution is unambiguous, or a list of
+    candidate qualified names if the function name is ambiguous. Raises
+    HTTPException(404) if no function with that name exists."""
+
+    if function_name in graph.nodes:
+        return function_name
+
+    candidates = [
+        qname for qname, data in graph.nodes(data=True)
+        if data.get("name") == function_name
+    ]
+
+    if not candidates:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No function named '{function_name}' found in this repo.",
+        )
+    if len(candidates) == 1:
+        return candidates[0]
+    return candidates
+
+
 @app.post("/diagram", response_model=DiagramResponse | AmbiguousDiagramResponse)
 def diagram(request: DiagramRequest, current_user: User = Depends(get_current_user)) -> DiagramResponse | AmbiguousDiagramResponse:
     graph = load_call_graph(current_user.id, request.repo_name)
@@ -526,22 +584,10 @@ def diagram(request: DiagramRequest, current_user: User = Depends(get_current_us
     if graph is None:
         raise HTTPException(status_code=404, detail=f"Repo '{request.repo_name}' not found.")
 
-    candidates = [
-        qname for qname, data in graph.nodes(data=True)
-        if data.get("name") == request.function_name
-    ]
-
-    if request.function_name in graph.nodes:
-        qualified_name = request.function_name
-    elif not candidates:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No function named '{request.function_name}' found in this repo.",
-        )
-    elif len(candidates) == 1:
-        qualified_name = candidates[0]
-    else:
-        return AmbiguousDiagramResponse(ambiguous=True, candidates=candidates)
+    resolved = _resolve_function_name(graph, request.function_name)
+    if isinstance(resolved, list):
+        return AmbiguousDiagramResponse(ambiguous=True, candidates=resolved)
+    qualified_name = resolved
 
     subgraph = trace_subgraph(graph, qualified_name, max_depth=request.max_depth)
     result = generate_flow_diagram(subgraph, qualified_name)
@@ -552,5 +598,48 @@ def diagram(request: DiagramRequest, current_user: User = Depends(get_current_us
         node_count=result["node_count"],
         edge_count=result["edge_count"],
         truncated=result["truncated"],
+        qualified_name=qualified_name,
+    )
+
+
+@app.get("/blast-radius/{repo_name}", response_model=BlastRadiusResponse | AmbiguousBlastRadiusResponse)
+def blast_radius(
+    repo_name: str,
+    function_name: str,
+    max_depth: int = 3,
+    current_user: User = Depends(get_current_user),
+) -> BlastRadiusResponse | AmbiguousBlastRadiusResponse:
+    graph = load_call_graph(current_user.id, repo_name)
+
+    if graph is None:
+        raise HTTPException(status_code=404, detail=f"Repo '{repo_name}' not found.")
+
+    resolved = _resolve_function_name(graph, function_name)
+    if isinstance(resolved, list):
+        return AmbiguousBlastRadiusResponse(ambiguous=True, candidates=resolved)
+    qualified_name = resolved
+
+    subgraph = get_transitive_callers(graph, qualified_name, max_depth=max_depth)
+
+    distances = nx.single_source_shortest_path_length(subgraph.reverse(copy=False), qualified_name)
+
+    nodes = [
+        BlastRadiusNode(
+            id=node,
+            label=data.get("name", Path(node.split("::")[0]).name),
+            distance=distances.get(node),
+        )
+        for node, data in subgraph.nodes(data=True)
+    ]
+
+    edges = [
+        BlastRadiusEdge(source=source, target=target, weight=1)
+        for source, target in subgraph.edges()
+    ]
+
+    return BlastRadiusResponse(
+        ambiguous=False,
+        nodes=nodes,
+        edges=edges,
         qualified_name=qualified_name,
     )

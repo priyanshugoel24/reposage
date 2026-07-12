@@ -224,3 +224,10 @@ as isolated/disconnected nodes in build_call_graph, or hide the "View in
 architecture" button entirely for citations whose file_path isn't a known
 graph node (would need the frontend to know the node-id set up front,
 which it currently only discovers after fetching the graph).
+
+
+get_transitive_callers's depth-2/3 logic is implemented and reuses the
+same proven BFS mechanics as Day 18's trace_subgraph (forward direction),
+but hasn't been verified against a real multi-hop case in this repo —
+every tested function's callers turned out to be terminal entry points at
+distance 1. Revisit if a deeper repo becomes available to test against.

@@ -3,6 +3,7 @@ import networkx as nx
 from reposage.parsing.extractor import (parse_calls, parse_imports, build_symbol_table, resolve_calls_for_file)
 import json
 import os
+from collections import deque
 from pathlib import Path
 from networkx.readwrite import json_graph
 
@@ -75,6 +76,35 @@ def get_callees(graph : nx.DiGraph, qualified_name : str) -> list[str]:
     if qualified_name not in graph:
         return []
     return list(graph.successors(qualified_name))
+
+
+def get_transitive_callers(graph: nx.DiGraph, qualified_name: str, max_depth: int = 3) -> nx.DiGraph:
+    """BFS backward from qualified_name following incoming edges (predecessors) up to
+    max_depth hops. Returns a subgraph of exactly the nodes and edges traversed."""
+
+    subgraph = nx.DiGraph()
+
+    if qualified_name not in graph:
+        return subgraph
+
+    visited = {qualified_name}
+    queue = deque([(qualified_name, 0)])
+    subgraph.add_node(qualified_name, **graph.nodes[qualified_name])
+
+    while queue:
+        node, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+
+        for predecessor in graph.predecessors(node):
+            subgraph.add_node(predecessor, **graph.nodes[predecessor])
+            subgraph.add_edge(predecessor, node, **graph.edges[predecessor, node])
+
+            if predecessor not in visited:
+                visited.add(predecessor)
+                queue.append((predecessor, depth + 1))
+
+    return subgraph
 
 
 def trace_path(graph : nx.DiGraph, start : str, end : str) -> list[str] | None:
