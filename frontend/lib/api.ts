@@ -209,6 +209,8 @@ export interface ArchitectureNode {
   label: string;
   tier: ArchitectureTier;
   centrality: number;
+  function_count: number;
+  functions: string[];
 }
 
 export interface ArchitectureEdge {

@@ -48,6 +48,7 @@ export default function Home() {
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [activeView, setActiveView] = useState<View>("repos");
+  const [pendingChatQuestion, setPendingChatQuestion] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -118,6 +119,8 @@ export default function Home() {
             disabled={repos.length === 0}
             onReingested={handleIngested}
             onRemoved={handleRepoDeleted}
+            initialQuestion={pendingChatQuestion}
+            onInitialQuestionConsumed={() => setPendingChatQuestion(null)}
           />
         )}
         {activeView === "architecture" && (
@@ -128,6 +131,10 @@ export default function Home() {
             disabled={repos.length === 0}
             onReingested={handleIngested}
             onRemoved={handleRepoDeleted}
+            onAskInChat={(question) => {
+              setPendingChatQuestion(question);
+              setActiveView("chat");
+            }}
           />
         )}
         {activeView === "repos" && (

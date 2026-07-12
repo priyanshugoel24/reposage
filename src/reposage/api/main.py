@@ -169,6 +169,8 @@ class ArchitectureNode(BaseModel):
     label: str
     tier: str
     centrality: float
+    function_count: int
+    functions: list[str]
 
 
 class ArchitectureEdge(BaseModel):
@@ -373,6 +375,10 @@ def architecture_graph(repo_name: str, current_user: User = Depends(get_current_
         else None
     )
 
+    functions_by_file: dict[str, list[str]] = {}
+    for _, data in graph.nodes(data=True):
+        functions_by_file.setdefault(data["file"], []).append(data["name"])
+
     nodes = []
     for node in module_graph.nodes:
         if node in entry_files:
@@ -382,8 +388,17 @@ def architecture_graph(repo_name: str, current_user: User = Depends(get_current_
         else:
             tier = "utility"
 
+        module_functions = sorted(functions_by_file.get(node, []))
+
         nodes.append(
-            ArchitectureNode(id=node, label=Path(node).name, tier=tier, centrality=normalized[node])
+            ArchitectureNode(
+                id=node,
+                label=Path(node).name,
+                tier=tier,
+                centrality=normalized[node],
+                function_count=len(module_functions),
+                functions=module_functions[:15],
+            )
         )
 
     edges = [

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ApiError, queryRepo, QueryResponse, RepoInfo } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 import CitationCard from "@/components/CitationCard";
@@ -12,15 +12,32 @@ interface QueryFormProps {
   disabled: boolean;
   onReingested: (repoName: string) => void;
   onRemoved: (repoName: string) => void;
+  initialQuestion?: string | null;
+  onInitialQuestionConsumed?: () => void;
 }
 
-export default function QueryForm({ repoName, repo, disabled, onReingested, onRemoved }: QueryFormProps) {
+export default function QueryForm({
+  repoName,
+  repo,
+  disabled,
+  onReingested,
+  onRemoved,
+  initialQuestion,
+  onInitialQuestionConsumed,
+}: QueryFormProps) {
   const [question, setQuestion] = useState("");
   const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set([0]));
+
+  useEffect(() => {
+    if (!initialQuestion) return;
+    setQuestion(initialQuestion);
+    onInitialQuestionConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion]);
 
   function toggleCitation(index: number) {
     setExpandedIndices((prev) => {
