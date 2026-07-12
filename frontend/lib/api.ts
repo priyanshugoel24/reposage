@@ -263,3 +263,55 @@ export async function getTour(repo_name: string): Promise<TourResponse> {
 
   return response.json();
 }
+
+export interface AmbiguousBlastRadiusResponse {
+  ambiguous: true;
+  candidates: string[];
+}
+
+export interface BlastRadiusNode {
+  id: string;
+  label: string;
+  distance: number | null;
+  centrality: number | null;
+  function_count: number | null;
+  functions: string[] | null;
+}
+
+export interface BlastRadiusEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface BlastRadiusResponse {
+  ambiguous: false;
+  nodes: BlastRadiusNode[];
+  edges: BlastRadiusEdge[];
+  qualified_name: string;
+}
+
+export type GetBlastRadiusResponse = AmbiguousBlastRadiusResponse | BlastRadiusResponse;
+
+export async function getBlastRadius(
+  repo_name: string,
+  function_name: string,
+  max_depth?: number
+): Promise<GetBlastRadiusResponse> {
+  const params = new URLSearchParams({ function_name });
+  if (max_depth !== undefined) {
+    params.set("max_depth", String(max_depth));
+  }
+
+  const response = await fetch(
+    `${API_URL}/blast-radius/${encodeURIComponent(repo_name)}?${params.toString()}`,
+    { credentials: "include" }
+  );
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}

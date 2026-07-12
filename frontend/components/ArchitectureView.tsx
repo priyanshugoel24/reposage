@@ -4,6 +4,7 @@ import { useState } from "react";
 import DiagramForm from "@/components/DiagramForm";
 import CodebaseMapView from "@/components/CodebaseMapView";
 import ModuleArchitectureGraph from "@/components/ModuleArchitectureGraph";
+import BlastRadiusView from "@/components/BlastRadiusView";
 import RepoActionsMenu from "@/components/RepoActionsMenu";
 import { RepoInfo } from "@/lib/api";
 
@@ -18,7 +19,7 @@ interface ArchitectureViewProps {
   onInitialNodeConsumed?: () => void;
 }
 
-type Tab = "graph" | "tools";
+type Tab = "graph" | "tools" | "blast-radius";
 
 export default function ArchitectureView({
   repoName,
@@ -70,6 +71,17 @@ export default function ArchitectureView({
           >
             Diagram &amp; codebase map
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("blast-radius")}
+            className={`rounded px-3 py-1.5 font-bold transition-colors ${
+              activeTab === "blast-radius"
+                ? "bg-accent text-accent-foreground"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            Blast Radius
+          </button>
         </div>
 
         {activeTab === "graph" && (
@@ -103,6 +115,19 @@ export default function ArchitectureView({
               <CodebaseMapView repoName={repoName} disabled={disabled} />
             </section>
           </div>
+        )}
+
+        {activeTab === "blast-radius" && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-text-muted">
+              Blast radius
+            </h2>
+            <p className="text-sm text-text-secondary">
+              See everything that transitively depends on a function, so you know what you risk
+              breaking before you change it.
+            </p>
+            <BlastRadiusView repoName={repoName} disabled={disabled} />
+          </section>
         )}
       </div>
     </div>

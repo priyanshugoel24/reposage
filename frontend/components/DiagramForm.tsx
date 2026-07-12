@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
 import { ApiError, getDiagram, GetDiagramResponse } from "@/lib/api";
+import AmbiguousCandidatePicker from "@/components/AmbiguousCandidatePicker";
 
 interface DiagramFormProps {
   repoName: string | null;
@@ -31,7 +32,6 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
   const [functionName, setFunctionName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GetDiagramResponse | null>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDark = useIsDarkMode();
@@ -45,7 +45,6 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
     try {
       const response = await getDiagram(repoName, name);
       setResult(response);
-      setSelectedCandidate("");
     } catch (err) {
       setResult(null);
       setError(err instanceof ApiError ? err.message : "Failed to reach the server.");
@@ -57,11 +56,6 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await runDiagram(functionName);
-  }
-
-  async function handleGenerateFromCandidate() {
-    if (!selectedCandidate) return;
-    await runDiagram(selectedCandidate);
   }
 
   useEffect(() => {
@@ -113,31 +107,11 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
       {error && <p className="text-sm text-danger">{error}</p>}
 
       {result && result.ambiguous && (
-        <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-inset p-4">
-          <p className="text-sm text-text-secondary">Multiple functions match that name. Pick one:</p>
-          <select
-            value={selectedCandidate}
-            onChange={(e) => setSelectedCandidate(e.target.value)}
-            className="rounded-md border border-border-strong bg-surface px-3 py-2 font-mono text-sm text-text-primary"
-          >
-            <option value="" disabled>
-              Select a candidate
-            </option>
-            {result.candidates.map((candidate) => (
-              <option key={candidate} value={candidate}>
-                {candidate}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleGenerateFromCandidate}
-            disabled={isLoading || !selectedCandidate}
-            className="self-start rounded-md bg-accent px-4 py-2 font-mono text-sm font-bold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isLoading ? "Generating..." : "Generate"}
-          </button>
-        </div>
+        <AmbiguousCandidatePicker
+          candidates={result.candidates}
+          isLoading={isLoading}
+          onResolve={runDiagram}
+        />
       )}
 
       {result && !result.ambiguous && (
