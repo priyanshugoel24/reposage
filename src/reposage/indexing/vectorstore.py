@@ -23,6 +23,15 @@ def get_collection(user_id : int, repo_name : str) :
     )
 
 
+def delete_collection(user_id : int, repo_name : str) -> None:
+    client = chromadb.PersistentClient(path = str(CHROMA_PATH))
+    try:
+        client.delete_collection(name = f"user_{user_id}_{repo_name}")
+    except Exception:
+        # Collection didn't exist — deleting an already-absent collection is a no-op.
+        pass
+
+
 def upsert_chunks(collection, chunks : list[Chunk]):
     if not chunks :
         return

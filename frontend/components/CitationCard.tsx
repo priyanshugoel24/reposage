@@ -10,6 +10,9 @@ import { Citation } from "@/lib/api";
 interface CitationCardProps {
   citation: Citation;
   githubUrl?: string | null;
+  index?: number;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 function languageForFile(filePath: string): string {
@@ -28,45 +31,85 @@ function languageForFile(filePath: string): string {
   }
 }
 
-export default function CitationCard({ citation, githubUrl }: CitationCardProps) {
+export default function CitationCard({
+  citation,
+  githubUrl,
+  index,
+  isExpanded,
+  onToggle,
+}: CitationCardProps) {
   const { file_path, start_line, end_line, source_code } = citation;
-  const label = `${file_path}:${start_line}-${end_line}`;
   const language = languageForFile(file_path);
 
   return (
-    <div className="overflow-hidden rounded-md border border-zinc-400 bg-zinc-50 text-xs dark:border-zinc-600 dark:bg-zinc-900">
-      <div className="border-b border-zinc-400 px-3 py-2 font-mono text-zinc-700 dark:border-zinc-600 dark:text-zinc-300">
-        {githubUrl ? (
-          <a
-            href={`${githubUrl}/blob/main/${file_path}#L${start_line}-L${end_line}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
+    <div className="overflow-hidden rounded-md border border-border bg-bg-inset">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex cursor-pointer select-none items-center justify-between gap-2 border-b border-border px-3 py-2"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={`inline-block shrink-0 text-text-muted transition-transform ${
+              isExpanded ? "rotate-90" : ""
+            }`}
           >
-            {label}
-          </a>
-        ) : (
-          <span>{label}</span>
-        )}
+            ▶
+          </span>
+          {githubUrl ? (
+            <a
+              href={`${githubUrl}/blob/main/${file_path}#L${start_line}-L${end_line}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="truncate font-mono text-xs font-bold text-text-primary hover:text-accent"
+            >
+              {file_path}
+            </a>
+          ) : (
+            <span className="truncate font-mono text-xs font-bold text-text-primary">
+              {file_path}
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 pl-2 font-mono text-xs text-text-muted">
+          lines {start_line}–{end_line}
+        </span>
       </div>
-      <div className="[&_pre]:!m-0">
-        <SyntaxHighlighter
-          language={language}
-          style={oneLight}
-          customStyle={{ margin: 0, background: "var(--surface-1)", fontSize: "0.75rem" }}
-          className="block dark:hidden"
-        >
-          {source_code}
-        </SyntaxHighlighter>
-        <SyntaxHighlighter
-          language={language}
-          style={oneDark}
-          customStyle={{ margin: 0, background: "var(--surface-1)", fontSize: "0.75rem" }}
-          className="hidden dark:block"
-        >
-          {source_code}
-        </SyntaxHighlighter>
-      </div>
+
+      {isExpanded && (
+        <div className="[&_pre]:!m-0">
+          <SyntaxHighlighter
+            language={language}
+            style={oneLight}
+            customStyle={{ margin: 0, background: "var(--color-bg-inset)", fontSize: "0.75rem" }}
+            className="block dark:hidden"
+          >
+            {source_code}
+          </SyntaxHighlighter>
+          <SyntaxHighlighter
+            language={language}
+            style={oneDark}
+            customStyle={{ margin: 0, background: "var(--color-bg-inset)", fontSize: "0.75rem" }}
+            className="hidden dark:block"
+          >
+            {source_code}
+          </SyntaxHighlighter>
+        </div>
+      )}
+
+      {index !== undefined && (
+        <div className="border-t border-border px-3 py-1.5 font-mono text-xs text-text-muted">
+          reference [{index + 1}]
+        </div>
+      )}
     </div>
   );
 }

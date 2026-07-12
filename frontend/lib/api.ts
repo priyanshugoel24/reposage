@@ -47,11 +47,59 @@ interface ErrorResponse {
 
 export class ApiError extends Error {}
 
-export async function getRepos(): Promise<string[]> {
+export interface RepoInfo {
+  repo_name: string;
+  summary: string;
+  language: string | null;
+  files_processed: number;
+  chunks_created: number;
+  ingested_at: string;
+  source_url: string;
+}
+
+export async function getRepos(): Promise<RepoInfo[]> {
   const response = await fetch(`${API_URL}/repos`, { credentials: "include" });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch repos: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export interface DeleteRepoResponse {
+  repo_name: string;
+  deleted: boolean;
+}
+
+export async function deleteRepo(repo_name: string): Promise<DeleteRepoResponse> {
+  const response = await fetch(`${API_URL}/repos/${encodeURIComponent(repo_name)}`, {
+    method: "DELETE",
+    headers: await getCsrfHeaders(),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
+  }
+
+  return response.json();
+}
+
+export interface SummaryResponse {
+  repo_name: string;
+  summary: string;
+}
+
+export async function getSummary(repo_name: string): Promise<SummaryResponse> {
+  const response = await fetch(`${API_URL}/summary/${encodeURIComponent(repo_name)}`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const body: ErrorResponse = await response.json();
+    throw new ApiError(body.detail);
   }
 
   return response.json();

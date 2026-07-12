@@ -22,6 +22,7 @@ def save_summary(
     summary: str,
     files_processed: int,
     chunks_created: int,
+    language: str | None = None,
 ) -> None:
     with SessionLocal() as session:
         existing = session.scalar(
@@ -33,6 +34,7 @@ def save_summary(
             existing.summary = summary
             existing.files_processed = files_processed
             existing.chunks_created = chunks_created
+            existing.language = language
             existing.ingested_at = datetime.now(timezone.utc)
         else:
             session.add(
@@ -44,6 +46,7 @@ def save_summary(
                     summary=summary,
                     files_processed=files_processed,
                     chunks_created=chunks_created,
+                    language=language,
                 )
             )
         session.commit()
@@ -62,10 +65,36 @@ def get_summary(user_id: int, repo_name: str) -> dict | None:
             "github_url": repo.github_url,
             "files_processed": repo.files_processed,
             "chunks_created": repo.chunks_created,
+            "language": repo.language,
+            "ingested_at": repo.ingested_at,
         }
 
 
-def list_repos(user_id: int) -> list[str]:
+def list_repos(user_id: int) -> list[dict]:
     with SessionLocal() as session:
-        rows = session.scalars(select(Repo.repo_name).where(Repo.user_id == user_id))
-        return list(rows)
+        rows = session.scalars(select(Repo).where(Repo.user_id == user_id))
+        return [
+            {
+                "repo_name": repo.repo_name,
+                "summary": repo.summary,
+                "language": repo.language,
+                "files_processed": repo.files_processed,
+                "chunks_created": repo.chunks_created,
+                "ingested_at": repo.ingested_at,
+                "source_url": repo.source_url,
+            }
+            for repo in rows
+        ]
+
+
+def delete_repo(user_id: int, repo_name: str) -> bool:
+    """Delete the DB row for this repo. Returns False if not found/not owned by user_id."""
+    with SessionLocal() as session:
+        existing = session.scalar(
+            select(Repo).where(Repo.user_id == user_id, Repo.repo_name == repo_name)
+        )
+        if existing is None:
+            return False
+        session.delete(existing)
+        session.commit()
+        return True

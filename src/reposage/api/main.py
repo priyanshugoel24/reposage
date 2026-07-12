@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import lru_cache
 import time
 
@@ -9,12 +10,12 @@ from fastapi_nextauth_jwt.exceptions import NextAuthJWTException
 from pydantic import BaseModel
 
 from reposage.db.models import SessionLocal, User, init_db
-from reposage.ingestion.loader import load_repo, walk_source_files
+from reposage.ingestion.loader import detect_primary_language, load_repo, walk_source_files
 from reposage.indexing.chunk import build_chunks
-from reposage.indexing.summary_store import get_summary, github_url_for, list_repos, save_summary
-from reposage.indexing.vectorstore import get_collection, query_collection, upsert_chunks
+from reposage.indexing.summary_store import delete_repo, get_summary, github_url_for, list_repos, save_summary
+from reposage.indexing.vectorstore import delete_collection, get_collection, query_collection, upsert_chunks
 from reposage.rag.synthesize import generate_repo_summary, synthesize_answer
-from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph
+from reposage.graph.call_graph import build_call_graph, save_call_graph, load_call_graph, delete_call_graph
 from reposage.graph.flow_diagram import trace_subgraph, generate_flow_diagram
 from reposage.graph.codebase_map import detect_entry_points, build_module_graph, suggest_reading_order
 
@@ -82,6 +83,21 @@ class IngestResponse(BaseModel):
 class SummaryResponse(BaseModel):
     repo_name: str
     summary: str
+
+
+class RepoInfo(BaseModel):
+    repo_name: str
+    summary: str
+    language: str | None
+    files_processed: int
+    chunks_created: int
+    ingested_at: datetime
+    source_url: str
+
+
+class DeleteRepoResponse(BaseModel):
+    repo_name: str
+    deleted: bool
 
 
 class QueryRequest(BaseModel):
@@ -176,6 +192,7 @@ def ingest(request: IngestRequest, current_user: User = Depends(get_current_user
         raise HTTPException(status_code=400, detail=f"Source path does not exist: {request.source}")
 
     source_files = walk_source_files(repo_root)
+    language = detect_primary_language(source_files)
 
     chunks = []
     for source_file in source_files:
@@ -198,6 +215,7 @@ def ingest(request: IngestRequest, current_user: User = Depends(get_current_user
         summary,
         files_processed=len(source_files),
         chunks_created=len(chunks),
+        language=language,
     )
 
     return IngestResponse(
@@ -256,9 +274,21 @@ def query(request: QueryRequest, current_user: User = Depends(get_current_user))
     return QueryResponse(**answer, github_url=github_url)
 
 
-@app.get("/repos", response_model=list[str])
-def list_ingested_repos(current_user: User = Depends(get_current_user)) -> list[str]:
-    return list_repos(current_user.id)
+@app.get("/repos", response_model=list[RepoInfo])
+def list_ingested_repos(current_user: User = Depends(get_current_user)) -> list[RepoInfo]:
+    return [RepoInfo(**repo) for repo in list_repos(current_user.id)]
+
+
+@app.delete("/repos/{repo_name}", response_model=DeleteRepoResponse)
+def delete_ingested_repo(repo_name: str, current_user: User = Depends(get_current_user)) -> DeleteRepoResponse:
+    deleted = delete_repo(current_user.id, repo_name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Repo '{repo_name}' not found.")
+
+    delete_collection(current_user.id, repo_name)
+    delete_call_graph(current_user.id, repo_name)
+
+    return DeleteRepoResponse(repo_name=repo_name, deleted=True)
 
 
 @app.get("/codebase-map/{repo_name}", response_model=CodebaseMapResponse)

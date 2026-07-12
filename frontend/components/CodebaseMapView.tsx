@@ -35,36 +35,29 @@ export default function CodebaseMapView({ repoName, disabled }: CodebaseMapViewP
     : [];
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled || isLoading}
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+        className="self-start rounded-md bg-accent px-4 py-2 font-mono text-sm font-bold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? "Loading..." : "Show codebase map"}
       </button>
 
-      {isLoading && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading...</p>
-      )}
+      {isLoading && <p className="text-sm text-text-muted">Loading...</p>}
 
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {result && (
-        <div className="flex flex-col gap-6 rounded-md border border-zinc-300 bg-zinc-50 p-4 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+        <div className="flex flex-col gap-6 rounded-md border border-border bg-bg-inset p-5">
           <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-text-muted">
               Entry points
             </h3>
-            <div
-              className="max-h-64 overflow-y-auto rounded-md border border-zinc-400 p-2 font-mono text-xs dark:border-zinc-600"
-              style={{ background: "var(--surface-1)" }}
-            >
+            <div className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface p-3 font-mono text-xs text-text-secondary">
               {result.entry_points.length === 0 ? (
-                <p className="text-zinc-500 dark:text-zinc-400">No entry points found.</p>
+                <p className="text-text-muted">No entry points found.</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {result.entry_points.map((entryPoint) => (
@@ -76,30 +69,30 @@ export default function CodebaseMapView({ repoName, disabled }: CodebaseMapViewP
           </div>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-text-muted">
               Module dependencies
             </h3>
             {sortedEdges.length === 0 ? (
-              <p className="text-zinc-500 dark:text-zinc-400">No module dependencies found.</p>
+              <p className="text-sm text-text-muted">No module dependencies found.</p>
             ) : (
-              <div className="max-h-64 overflow-y-auto rounded-md border border-zinc-400 dark:border-zinc-600">
-                <table className="w-full text-left font-mono text-xs">
-                  <thead className="sticky top-0" style={{ background: "var(--surface-1)" }}>
+              <div className="max-h-64 overflow-y-auto rounded-md border border-border">
+                <table className="w-full text-left font-mono text-xs text-text-secondary">
+                  <thead className="sticky top-0 bg-surface text-text-primary">
                     <tr>
-                      <th className="px-2 py-1 font-semibold">Source</th>
-                      <th className="px-2 py-1 font-semibold">Target</th>
-                      <th className="px-2 py-1 font-semibold">Calls</th>
+                      <th className="px-3 py-2 font-bold">Source</th>
+                      <th className="px-3 py-2 font-bold">Target</th>
+                      <th className="px-3 py-2 font-bold">Calls</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedEdges.map((edge, index) => (
                       <tr
                         key={`${edge.source}-${edge.target}-${index}`}
-                        className="border-t border-zinc-300 dark:border-zinc-700"
+                        className="border-t border-border"
                       >
-                        <td className="px-2 py-1">{edge.source}</td>
-                        <td className="px-2 py-1">{edge.target}</td>
-                        <td className="px-2 py-1">{edge.call_count}</td>
+                        <td className="px-3 py-2">{edge.source}</td>
+                        <td className="px-3 py-2">{edge.target}</td>
+                        <td className="px-3 py-2">{edge.call_count}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -109,13 +102,13 @@ export default function CodebaseMapView({ repoName, disabled }: CodebaseMapViewP
           </div>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-text-muted">
               Suggested reading order
             </h3>
             {result.reading_order.length === 0 ? (
-              <p className="text-zinc-500 dark:text-zinc-400">No reading order available.</p>
+              <p className="text-sm text-text-muted">No reading order available.</p>
             ) : (
-              <ol className="flex list-decimal flex-col gap-1 pl-5 font-mono text-xs">
+              <ol className="flex list-decimal flex-col gap-1 pl-5 font-mono text-xs text-text-secondary">
                 {result.reading_order.map((item) => (
                   <li key={item}>{item}</li>
                 ))}

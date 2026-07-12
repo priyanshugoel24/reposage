@@ -1,6 +1,10 @@
+from reposage.db.models import init_db
 from reposage.indexing.vectorstore import get_collection, query_collection
 
-collection = get_collection("medmemory-mcp")
+init_db()
+init_db()
+
+collection = get_collection(user_id=65210891, repo_name="medmemory-mcp")
 
 queries = [
     "where is health document ingestion handled",

@@ -186,3 +186,13 @@ test_synthesize.py, test_indexing.py, test_query.py now call functions
 with outdated signatures (missing required user_id param) after the
 Phase 1 Task 2 DB/multi-tenant migration. Not fixed yet — revisit when
 next touching call-graph/vectorstore code (likely Phase 3).
+
+
+get_collection(user_id, repo_name) silently creates a new, empty ChromaDB
+collection if the (user_id, repo_name) pair doesn't already exist,
+instead of raising an error. Discovered when a test script passed the
+wrong user_id (0 instead of the real GitHub ID) and got a clean run with
+zero results everywhere, instead of a clear failure. Worth hardening
+later: get_collection could check the DB's Repo table first and raise a
+clear error if no matching row exists, rather than allowing silent
+phantom-collection creation.

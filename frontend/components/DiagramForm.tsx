@@ -88,8 +88,8 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
   }, [result, isDark]);
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-4">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex items-center gap-3">
         <input
           type="text"
           value={functionName}
@@ -97,34 +97,28 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
           placeholder={disabled ? "Ingest a repo first" : "Function name"}
           required
           disabled={disabled || isLoading}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+          className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={disabled || isLoading}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+          className="rounded-md bg-accent px-4 py-2 font-mono text-sm font-bold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? "Generating..." : "Show diagram"}
         </button>
       </form>
 
-      {isLoading && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Generating...</p>
-      )}
+      {isLoading && <p className="text-sm text-text-muted">Generating...</p>}
 
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {result && result.ambiguous && (
-        <div className="flex flex-col gap-2 rounded-md border border-zinc-300 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-900">
-          <p className="text-zinc-700 dark:text-zinc-300">
-            Multiple functions match that name. Pick one:
-          </p>
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-inset p-4">
+          <p className="text-sm text-text-secondary">Multiple functions match that name. Pick one:</p>
           <select
             value={selectedCandidate}
             onChange={(e) => setSelectedCandidate(e.target.value)}
-            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+            className="rounded-md border border-border-strong bg-surface px-3 py-2 font-mono text-sm text-text-primary"
           >
             <option value="" disabled>
               Select a candidate
@@ -139,7 +133,7 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
             type="button"
             onClick={handleGenerateFromCandidate}
             disabled={isLoading || !selectedCandidate}
-            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+            className="self-start rounded-md bg-accent px-4 py-2 font-mono text-sm font-bold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "Generating..." : "Generate"}
           </button>
@@ -147,8 +141,8 @@ export default function DiagramForm({ repoName, disabled }: DiagramFormProps) {
       )}
 
       {result && !result.ambiguous && (
-        <div className="flex flex-col gap-2 rounded-md border border-zinc-300 bg-zinc-50 p-4 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-inset p-4">
+          <p className="font-mono text-xs text-text-muted">
             {result.qualified_name} &middot; {result.node_count} nodes &middot;{" "}
             {result.edge_count} edges
             {result.truncated ? " · truncated" : ""}

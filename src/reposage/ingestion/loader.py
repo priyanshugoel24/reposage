@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 import json
@@ -9,6 +10,16 @@ import zipfile
 
 SOURCE_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".java"}
 IGNORE_DIRS = {".git", "node_modules", "__pycahce__", "venv", ".venv", "dist", "build", "logs", ".github"}
+
+EXTENSION_LABELS = {
+    ".py": "PY",
+    ".ts": "TS",
+    ".tsx": "TS",
+    ".js": "JS",
+    ".jsx": "JS",
+    ".md": "MD",
+    ".hcl": "HCL",
+}
 
 GITHUB_URL_RE = re.compile(r"github\.com[:/]([^/]+)/([^/.]+?)(?:\.git)?/?$")
 
@@ -81,4 +92,15 @@ def walk_source_files(repo_root : Path) -> list[SourceFile]:
             last_modified=stat.st_mtime,
         ))
     return files
+
+
+def detect_primary_language(files: list[SourceFile]) -> str | None:
+    """Most common file extension among ingested files, mapped to a short display label."""
+    if not files:
+        return None
+
+    most_common_extension, _ = Counter(f.extension for f in files).most_common(1)[0]
+    if most_common_extension in EXTENSION_LABELS:
+        return EXTENSION_LABELS[most_common_extension]
+    return most_common_extension.lstrip(".").upper() or None
 

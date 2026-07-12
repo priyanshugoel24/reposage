@@ -58,6 +58,11 @@ def load_call_graph(user_id : int, repo_name : str) -> nx.DiGraph | None:
     return json_graph.node_link_graph(data, directed=True)
 
 
+def delete_call_graph(user_id : int, repo_name : str) -> None:
+    path = GRAPH_DIR / f"{user_id}_{repo_name}.json"
+    path.unlink(missing_ok=True)
+
+
 def get_callers(graph : nx.DiGraph, qualified_name : str) -> list[str]:
     """Who calls this function"""
 

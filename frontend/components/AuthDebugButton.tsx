@@ -21,18 +21,18 @@ export default function AuthDebugButton() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded border border-dashed border-amber-500 p-3 text-sm">
-      <span className="text-amber-600 dark:text-amber-400">
+    <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-warning/50 p-3 text-sm">
+      <span className="font-mono text-xs text-warning">
         [TEMP] Backend auth debug — remove later
       </span>
       <button
         onClick={testBackendAuth}
-        className="rounded border border-zinc-300 px-2 py-1 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+        className="rounded-md border border-border-strong px-2 py-1 font-mono text-xs text-text-secondary hover:bg-surface-hover"
       >
         Test backend auth
       </button>
       {result && (
-        <pre className="max-w-md overflow-x-auto whitespace-pre-wrap break-all text-left text-xs text-zinc-600 dark:text-zinc-400">
+        <pre className="max-w-md overflow-x-auto whitespace-pre-wrap break-all text-left font-mono text-xs text-text-muted">
           {result}
         </pre>
       )}
