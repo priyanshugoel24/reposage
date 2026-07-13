@@ -26,7 +26,7 @@ Under the hood, ingestion walks the source tree with tree-sitter to extract func
 - **Same-origin proxy:** the frontend and backend live on different domains (`reposage-two.vercel.app` / `reposage-a0n6.onrender.com`), and browsers won't reliably attach a cross-site session cookie to a request. Instead of relying on `SameSite=None` cookies, the frontend proxies all API calls through a Next.js rewrite (`/api/backend/:path* -> BACKEND_URL/:path*`), so from the browser's perspective every request stays same-origin and the session cookie is attached automatically. See `frontend/next.config.ts` and `frontend/lib/api.ts`.
 - **Parsing & graph analysis:** `tree-sitter` for symbol extraction, `networkx` for the call graph, module graph, and PageRank-based centrality (used for the architecture view and tour ordering)
 - **Storage:** Postgres with `pgvector` (via SQLAlchemy) for both application data (users, repos, summaries) and code-chunk embeddings/vector search
-- **LLM stack:** Google Gemini (`google-genai`) — `gemini-embedding-001` for embeddings, used for chat synthesis, repo summaries, and tour narration
+- **LLM stack:** Google Gemini (`google-genai`) — `gemini-embedding-001` for code chunk embeddings, and `gemini-3.5-flash` for chat synthesis, repo summaries, and tour narration
 
 ## Local Development
 
@@ -50,6 +50,8 @@ Backend `.env` (repo root):
 ```
 GEMINI_API_KEY=
 AUTH_SECRET=       # must match the frontend's AUTH_SECRET
+AUTH_URL=          # optional locally; used to detect secure-cookie naming.
+                   # should match the frontend's deployed URL in production
 DATABASE_URL=      # postgres connection string, pgvector extension enabled
 ```
 
